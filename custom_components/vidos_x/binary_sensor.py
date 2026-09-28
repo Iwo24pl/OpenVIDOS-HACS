@@ -42,7 +42,9 @@ class VidosDoorbellBinarySensor(VidosEntity, BinarySensorEntity):
     """Doorbell / ring event (device field ``devicestatus.calling``)."""
 
     _attr_name = "Doorbell"
-    _attr_device_class = BinarySensorDeviceClass.DOORBELL
+    # HA has no DOORBELL device class for binary sensors - use occurrence + icon
+    _attr_device_class = BinarySensorDeviceClass.OCCURRENCE
+    _attr_icon = "mdi:doorbell"
 
     @property
     def is_on(self) -> bool:

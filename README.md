@@ -73,7 +73,7 @@ Notes:
 
 * For minimal latency set the poll interval option to **5 s** (a ring must be
   long enough to be caught by a poll; typical intercom calls are 20 s+).
-* `binary_sensor.*_doorbell` (device class `doorbell`) works too if you prefer
+* `binary_sensor.*_doorbell` (occurrence class, `mdi:doorbell` icon) works too if you prefer
   state-based triggers; attribute `last_rung` holds the last ring timestamp.
 
 ## Development
