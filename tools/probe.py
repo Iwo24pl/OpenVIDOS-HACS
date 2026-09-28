@@ -244,12 +244,25 @@ def build_watch_commands() -> list[tuple[str, str, str]]:
 
     Goal: find a command whose response changes while the bell rings -
     ``get.device.status`` was proven not to (2026-09-28 capture).
+    ``get.lock.status`` / ``get.live.status`` are JSON-only in the app and
+    answer -10 over the XML envelope; kept for completeness.
     """
     today = time.strftime("%Y-%m-%d 00:00:00")
+    year = time.strftime("%Y")
+    month = time.strftime("%m")
     return [
         ("status", "get.device.status", ""),
         ("lock", "get.lock.status", ""),
         ("live", "get.live.status", ""),
+        ("tfcard", "get.tfcard.info", ""),
+        (
+            "daylist",
+            "get.record.search",
+            "<content><record>"
+            "<channelmask>1</channelmask><stream>all</stream>"
+            f"<year>{year}</year><month>{month}</month>"
+            "</record></content>",
+        ),
         (
             "alarmrec",
             "get.record.alarmrecord",
@@ -318,6 +331,8 @@ def watch_status(
             }
             if first[label]:
                 first[label] = False
+                preview = " ".join(body.split())[:300]
+                print(f"  [{stamp}] {label}: baseline -> {preview}")
             else:
                 changes = diff_fields(prev_fields[label], fields)
                 for key, old, new in changes:
