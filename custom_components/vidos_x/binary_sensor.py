@@ -42,8 +42,9 @@ class VidosDoorbellBinarySensor(VidosEntity, BinarySensorEntity):
     """Doorbell / ring event (device field ``devicestatus.calling``)."""
 
     _attr_name = "Doorbell"
-    # HA has no DOORBELL device class for binary sensors - use occurrence + icon
-    _attr_device_class = BinarySensorDeviceClass.OCCURRENCE
+    # No device class: HA has no DOORBELL class, and OCCURRENCE was removed in
+    # 2026.x - use plain state + icon so every HA version loads.
+    _attr_device_class = None
     _attr_icon = "mdi:doorbell"
 
     @property
