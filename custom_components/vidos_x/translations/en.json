@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Vidos X",
+        "description": "Add a Vidos X intercom / door station.",
+        "data": {
+          "mode": "Setup mode"
+        },
+        "data_description": {
+          "mode": "Manual: you know the device IP. Cloud: sign in with your Vidos X account to discover devices."
+        }
+      },
+      "cloud": {
+        "title": "Vidos X account",
+        "data": {
+          "username": "Account (email / phone)",
+          "password": "Password"
+        }
+      },
+      "select_device": {
+        "title": "Select device",
+        "data": {
+          "device_uid": "Device"
+        }
+      },
+      "manual": {
+        "title": "Device connection",
+        "data": {
+          "device_ip": "Device IP address",
+          "cgi_port": "CGI port",
+          "device_username": "Device username",
+          "device_password": "Device password",
+          "verify_ssl": "Verify TLS certificate",
+          "scheme": "Scheme"
+        },
+        "data_description": {
+          "device_ip": "IP address of the intercom on your LAN.",
+          "cgi_port": "Usually 443 (HTTPS) or 80 (HTTP).",
+          "verify_ssl": "Disable if the device uses a self-signed certificate."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the device or cloud",
+      "invalid_auth": "Login rejected",
+      "no_devices": "No devices found on this account",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vidos X options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "verify_ssl": "Verify TLS certificate",
+          "enable_alarm_switch": "Enable alarm arm/disarm switch (experimental)",
+          "door_password": "Door opening password",
+          "rtsp_url": "RTSP stream URL"
+        },
+        "data_description": {
+          "rtsp_url": "e.g. rtsp://192.168.1.50:554/stream1 - enables the camera entity.",
+          "door_password": "Unlock password for set.device.opendoor. Leave empty to use the device password (sent SHA-256 hashed)."
+        }
+      }
+    }
+  },
+  "services": {
+    "open_door": {
+      "name": "Open door",
+      "description": "Open a door on a Vidos X device.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "Target Vidos X device(s)."
+        },
+        "door": {
+          "name": "Door",
+          "description": "Door / lock number.",
+          "example": "0"
+        },
+        "password": {
+          "name": "Password",
+          "description": "Optional door password."
+        }
+      }
+    }
+  }
+}

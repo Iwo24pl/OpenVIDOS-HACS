@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfiguracja Vidos X",
+        "description": "Dodaj domofon / stację bramową Vidos X.",
+        "data": {
+          "mode": "Tryb konfiguracji"
+        },
+        "data_description": {
+          "mode": "Ręcznie: znasz adres IP urządzenia. Chmurowo: zaloguj się kontem Vidos X, aby wyszukać urządzenia."
+        }
+      },
+      "cloud": {
+        "title": "Konto Vidos X",
+        "data": {
+          "username": "Konto (e-mail / telefon)",
+          "password": "Hasło"
+        }
+      },
+      "select_device": {
+        "title": "Wybierz urządzenie",
+        "data": {
+          "device_uid": "Urządzenie"
+        }
+      },
+      "manual": {
+        "title": "Połączenie z urządzeniem",
+        "data": {
+          "device_ip": "Adres IP urządzenia",
+          "cgi_port": "Port CGI",
+          "device_username": "Nazwa użytkownika urządzenia",
+          "device_password": "Hasło urządzenia",
+          "verify_ssl": "Weryfikuj certyfikat TLS",
+          "scheme": "Schemat"
+        },
+        "data_description": {
+          "device_ip": "Adres IP domofonu w sieci lokalnej.",
+          "cgi_port": "Zwykle 443 (HTTPS) lub 80 (HTTP).",
+          "verify_ssl": "Wyłącz, jeśli urządzenie używa certyfikatu samopodpisanego."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się z urządzeniem lub chmurą",
+      "invalid_auth": "Logowanie odrzucone",
+      "no_devices": "Nie znaleziono urządzeń na koncie",
+      "unknown": "Nieoczekiwany błąd"
+    },
+    "abort": {
+      "already_configured": "To urządzenie jest już skonfigurowane"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje Vidos X",
+        "data": {
+          "scan_interval": "Interwał odpytywania (sekundy)",
+          "verify_ssl": "Weryfikuj certyfikat TLS",
+          "enable_alarm_switch": "Włącz przełącznik uzbrojenia alarmu (eksperymentalny)",
+          "door_password": "Hasło otwierania drzwi",
+          "rtsp_url": "Adres strumienia RTSP"
+        },
+        "data_description": {
+          "rtsp_url": "np. rtsp://192.168.1.50:554/stream1 - włącza encję kamery.",
+          "door_password": "Hasło odblokowania do set.device.opendoor. Puste = użyj hasła urządzenia (wysyłane jako SHA-256)."
+        }
+      }
+    }
+  },
+  "services": {
+    "open_door": {
+      "name": "Otwórz drzwi",
+      "description": "Otwiera drzwi w urządzeniu Vidos X.",
+      "fields": {
+        "device_id": {
+          "name": "Urządzenie",
+          "description": "Docelowe urządzenie Vidos X."
+        },
+        "door": {
+          "name": "Drzwi",
+          "description": "Numer drzwi / zamka.",
+          "example": "0"
+        },
+        "password": {
+          "name": "Hasło",
+          "description": "Opcjonalne hasło drzwi."
+        }
+      }
+    }
+  }
+}

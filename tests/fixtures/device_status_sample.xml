@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<envelope>
+<body>
+<error>0</error>
+<content>
+<vionoff>
+<value>video_on</value>
+</vionoff>
+<info>
+<mac></mac>
+<version>V100.R001.A311.00.G0108.B018</version>
+<releasedate>2025-02-21t17:09:52z</releasedate>
+<model>IDS9483AW</model>
+</info>
+<time>
+<timezone>gmt+02:00</timezone>
+<datatime>2026-09-28 20:08:43</datatime>
+</time>
+<channel>
+<id>1</id>
+</channel>
+<upgradestatus>5</upgradestatus>
+<devability>AQBHDz8BAMAAERQAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</devability>
+<key>REDACTED_FOR_PUBLIC_FIXTURE</key>
+<tdc>REDACTED_FOR_PUBLIC_FIXTURE</tdc>
+<synctime>2026-10-02 12:47:16</synctime>
+<devicestatus>
+<volume>false</volume>
+<humandete>false</humandete>
+<detetioninfo>false</detetioninfo>
+<smd_peds>false</smd_peds>
+<smd_vehc>false</smd_vehc>
+<calling>false</calling>
+<lockstatus>false</lockstatus>
+<babysitter>false</babysitter>
+</devicestatus>
+</content>
+</body>
+</envelope>
