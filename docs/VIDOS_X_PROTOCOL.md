@@ -188,6 +188,24 @@ Full lists: `com/quvii/qvweb/device/DeviceRequestHelp.java` (XML) and
 `DeviceJsonRequestHelp.java` (JSON); interfaces `device/api/DeviceApi.java`,
 `DeviceJsonApi.java`.
 
+### 3.2 JSON protocol (second dialect — hardware-confirmed 2026-09-28)
+
+Same endpoint and same `header` credentials, but `Content-Type: application/json;charset=utf-8`
+and a JSON envelope (`QvCommonJsonRequest` + `QvJsonHeader`):
+
+```json
+{"header": {"username": "adminapp2", "password": "<sha256-hex>", "passwordencode": 1, "security": "username"},
+ "body": {"command": "get.lock.status", "content": {"...": "optional per-command content"}}}
+```
+
+* **JSON-only commands** (`get.lock.status`, `get.live.status`, `get.babysitter`,
+  `get.audio.session`, …) answer `error=-10` in the XML dialect — this is the missing piece.
+* **The response dialect is chosen per command, not per request**: `get.device.attachInfo`
+  sent in an *XML* envelope came back as JSON
+  (`{"body":{"error":0,"content":{"profile":{"chns":{"total":4,…` — 4 channels: cam 2, cctv 2).
+* Error codes parse the same (`"error": -10`); see `probe.extract_error` / `flatten_json`.
+* Probe support: `tools/probe.py --watch` sends `jlock`/`jaudio`/`jbabysitter` over JSON.
+
 ---
 
 ## 4. Live video / snapshot
