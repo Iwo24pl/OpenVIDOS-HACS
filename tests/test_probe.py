@@ -218,3 +218,18 @@ class UrlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DiffFieldsTests(unittest.TestCase):
+    def test_changed_value(self) -> None:
+        self.assertEqual(
+            probe.diff_fields({"calling": "false"}, {"calling": "true"}),
+            [("calling", "false", "true")],
+        )
+
+    def test_added_and_removed(self) -> None:
+        changes = probe.diff_fields({"a": "1"}, {"b": "2"})
+        self.assertEqual(changes, [("a", "1", None), ("b", None, "2")])
+
+    def test_no_changes(self) -> None:
+        self.assertEqual(probe.diff_fields({"x": "1"}, {"x": "1"}), [])

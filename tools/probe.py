@@ -34,6 +34,7 @@ import re
 import socket
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.request
 from xml.etree import ElementTree
@@ -208,6 +209,64 @@ def flatten_xml(body: str) -> dict[str, str]:
     return flat
 
 
+def diff_fields(
+    prev: dict[str, str], curr: dict[str, str]
+) -> list[tuple[str, str | None, str | None]]:
+    """Fields added/removed/changed between two flattened status responses."""
+    changes: list[tuple[str, str | None, str | None]] = []
+    for key in sorted(set(prev) | set(curr)):
+        old, new = prev.get(key), curr.get(key)
+        if old != new:
+            changes.append((key, old, new))
+    return changes
+
+
+def watch_status(
+    url: str,
+    username: str,
+    password: str,
+    passwordencode: bool,
+    seconds: int,
+    timeout: float,
+) -> int:
+    """Poll ``get.device.status`` every second and print changed fields.
+
+    Run it, then ring the bell - whatever the device reports during a ring
+    shows up here (which tells us the real field name for the doorbell).
+    """
+    print(f"[watch] polling every 1s for {seconds}s - RING THE BELL NOW")
+    prev: dict[str, str] | None = None
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        stamp = time.strftime("%H:%M:%S")
+        try:
+            _status, body = post(
+                url,
+                build_status_request(username, password, passwordencode),
+                timeout,
+                verify=False,
+            )
+        except (urllib.error.URLError, TimeoutError, OSError, ssl.SSLError) as exc:
+            print(f"  [{stamp}] transport: {exc}")
+            time.sleep(1)
+            continue
+        if extract_error(body) != 0:
+            print(f"  [{stamp}] error={extract_error(body)} {describe_error(extract_error(body))}")
+            time.sleep(1)
+            continue
+        fields = flatten_xml(body)
+        if prev is None:
+            prev = fields
+            print(f"  [{stamp}] baseline: {len(fields)} fields")
+        else:
+            for key, old, new in diff_fields(prev, fields):
+                print(f"  [{stamp}] {key}: {old!r} -> {new!r}")
+            prev = fields
+        time.sleep(1)
+    print("[watch] done - any changed field above is ring/call related")
+    return 0
+
+
 def build_combos(args: argparse.Namespace) -> list[tuple[str, str, tuple]]:
     """Ordered (secret_label, secret_value, variant) attempts."""
     secrets: list[tuple[str, str]] = []
@@ -271,6 +330,14 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="explicit unlock password; if omitted the probe derives candidates "
         "from --password/--qr (raw + sha256, app ability-24 path)",
+    )
+    parser.add_argument(
+        "--watch",
+        type=int,
+        default=0,
+        metavar="SECONDS",
+        help="after a successful status probe, poll every second for N seconds "
+        "and print changed fields (ring the bell while it runs)",
     )
     parser.add_argument(
         "--url",
@@ -345,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
 
     url, password, passwordencode, variant = working
     name, username, mode, _enc = variant
+    if args.watch > 0:
+        return watch_status(url, username, password, passwordencode, args.watch, args.timeout)
     if not args.open_door:
         print(f"\nRESULT: working CGI URL = {url}")
         print(f"RESULT: working variant = [{name}] (password mode={mode})")
