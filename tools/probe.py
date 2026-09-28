@@ -176,12 +176,16 @@ def escape_xml(value: str) -> str:
     )
 
 
-def post(url: str, payload: bytes, timeout: float, verify: bool) -> tuple[int, str]:
+def post(
+    url: str,
+    payload: bytes,
+    timeout: float,
+    verify: bool,
+    content_type: str = "application/xml;charset=utf-8",
+) -> tuple[int, str]:
     """POST payload, return (http_status, body_text). Raises on network errors."""
     context = ssl._create_unverified_context() if url.startswith("https") else None
-    request = urllib.request.Request(
-        url, data=payload, headers={"Content-Type": "application/xml;charset=utf-8"}
-    )
+    request = urllib.request.Request(url, data=payload, headers={"Content-Type": content_type})
     try:
         with urllib.request.urlopen(  # noqa: S310 - local device probe
             request, timeout=timeout, context=context
@@ -194,8 +198,42 @@ def post(url: str, payload: bytes, timeout: float, verify: bool) -> tuple[int, s
 
 
 def extract_error(body: str) -> int | None:
+    """Error code from an XML (``<error>``) or JSON (``"error":``) response."""
     match = re.search(r"<error>\s*(-?\d+)\s*</error>", body, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'"error"\s*:\s*(-?\d+)', body)
     return int(match.group(1)) if match else None
+
+
+def flatten_json(body: str) -> dict[str, str]:
+    """Flatten a JSON response into ``{>-joined lowercase path: str value}``."""
+    import json  # local: only watch mode needs it
+
+    flat: dict[str, str] = {}
+
+    def walk(node: object, prefix: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{prefix}>{str(key).lower()}")
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{prefix}>{index}")
+        else:
+            flat[prefix] = str(node)
+
+    try:
+        walk(json.loads(body), "json")
+    except (ValueError, TypeError):
+        return flat
+    return flat
+
+
+def flatten_any(body: str) -> dict[str, str]:
+    """Flatten XML or JSON response bodies."""
+    if body.lstrip().startswith("{"):
+        return flatten_json(body)
+    return flatten_xml(body)
 
 
 def flatten_xml(body: str) -> dict[str, str]:
@@ -239,25 +277,45 @@ def _is_noise(key: str) -> bool:
     return key.split(">")[-1] in NOISE_FIELDS
 
 
-def build_watch_commands() -> list[tuple[str, str, str]]:
-    """``(label, command, content)`` probed every cycle by ``--watch``.
+def build_json_request(command: str, username: str, password: str, passwordencode: bool) -> bytes:
+    """JSON envelope (DeviceJsonRequestHelp/QvJsonHeader shape)."""
+    import json  # local: only watch mode needs it
+
+    payload = {
+        "header": {
+            "password": password,
+            "passwordencode": 1 if passwordencode else 0,
+            "security": "username",
+            "username": username,
+        },
+        "body": {"command": command},
+    }
+    return json.dumps(payload).encode()
+
+
+def build_watch_commands() -> list[tuple[str, str, str, str]]:
+    """``(label, command, content, fmt)`` probed every cycle by ``--watch``.
 
     Goal: find a command whose response changes while the bell rings -
     ``get.device.status`` was proven not to (2026-09-28 capture).
-    ``get.lock.status`` / ``get.live.status`` are JSON-only in the app and
-    answer -10 over the XML envelope; kept for completeness.
+    ``fmt="json"`` uses the second protocol the device speaks (same URL,
+    Content-Type: application/json) - that's how the app sends lock/audio/
+    babysitter commands.
     """
     today = time.strftime("%Y-%m-%d 00:00:00")
     year = time.strftime("%Y")
     month = time.strftime("%m")
     return [
-        ("status", "get.device.status", ""),
-        ("sysstat", "get.system.status", ""),
-        ("soundlight", "get.soundandlight.state", ""),
-        ("attach", "get.device.attachInfo", ""),
-        ("lock", "get.lock.status", ""),
-        ("live", "get.live.status", ""),
-        ("tfcard", "get.tfcard.info", ""),
+        ("status", "get.device.status", "", "xml"),
+        ("sysstat", "get.system.status", "", "xml"),
+        ("soundlight", "get.soundandlight.state", "", "xml"),
+        ("attach", "get.device.attachInfo", "", "xml"),
+        ("jlock", "get.lock.status", "", "json"),
+        ("jaudio", "get.audio.session", "", "json"),
+        ("jbabysitter", "get.babysitter", "", "json"),
+        ("lock", "get.lock.status", "", "xml"),
+        ("live", "get.live.status", "", "xml"),
+        ("tfcard", "get.tfcard.info", "", "xml"),
         (
             "daylist",
             "get.record.search",
@@ -265,6 +323,7 @@ def build_watch_commands() -> list[tuple[str, str, str]]:
             "<channelmask>1</channelmask><stream>all</stream>"
             f"<year>{year}</year><month>{month}</month>"
             "</record></content>",
+            "xml",
         ),
         (
             "alarmrec",
@@ -274,6 +333,7 @@ def build_watch_commands() -> list[tuple[str, str, str]]:
             "<occurtype>event</occurtype><channel>1</channel>"
             f"<timestamp>{today}</timestamp>"
             "</record></content>",
+            "xml",
         ),
     ]
 
@@ -296,22 +356,25 @@ def watch_status(
         f"[watch] polling {len(commands)} commands every 1s for {seconds}s - "
         "RING THE BELL NOW (ring each of your bells separately if you have two)"
     )
-    prev_fields: dict[str, dict[str, str]] = {label: {} for label, _, _ in commands}
-    prev_raw: dict[str, str] = {label: "" for label, _, _ in commands}
-    first: dict[str, bool] = {label: True for label, _, _ in commands}
+    prev_fields: dict[str, dict[str, str]] = {label: {} for label, _, _, _ in commands}
+    prev_raw: dict[str, str] = {label: "" for label, _, _, _ in commands}
+    first: dict[str, bool] = {label: True for label, _, _, _ in commands}
     reported: set[str] = set()
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         stamp = time.strftime("%H:%M:%S")
-        for label, command, content in commands:
+        for label, command, content, fmt in commands:
+            if fmt == "json":
+                payload = build_json_request(command, username, password, passwordencode)
+                content_type = "application/json;charset=utf-8"
+            else:
+                payload = build_request(
+                    command, username, password, passwordencode, content
+                )
+                content_type = "application/xml;charset=utf-8"
             try:
                 _status, body = post(
-                    url,
-                    build_request(
-                        command, username, password, passwordencode, content
-                    ),
-                    timeout,
-                    verify=False,
+                    url, payload, timeout, verify=False, content_type=content_type
                 )
             except (urllib.error.URLError, TimeoutError, OSError, ssl.SSLError) as exc:
                 if label not in reported:
@@ -329,7 +392,7 @@ def watch_status(
                 continue
             fields = {
                 key: value
-                for key, value in flatten_xml(body).items()
+                for key, value in flatten_any(body).items()
                 if not _is_noise(key)
             }
             if first[label]:

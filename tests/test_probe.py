@@ -233,3 +233,51 @@ class DiffFieldsTests(unittest.TestCase):
 
     def test_no_changes(self) -> None:
         self.assertEqual(probe.diff_fields({"x": "1"}, {"x": "1"}), [])
+
+
+class JsonProtocolTests(unittest.TestCase):
+    def test_extract_error_json(self) -> None:
+        body = '{"body":{"error":-10,"content":{}}}'
+        self.assertEqual(probe.extract_error(body), -10)
+        self.assertEqual(probe.extract_error('{"body":{"error":0}}'), 0)
+
+    def test_flatten_json(self) -> None:
+        flat = probe.flatten_json('{"body":{"error":0,"content":{"a":{"b":"1"}}}}')
+        self.assertEqual(flat["json>body>content>a>b"], "1")
+
+    def test_flatten_json_list(self) -> None:
+        flat = probe.flatten_json('{"x":[{"v":"a"},{"v":"b"}]}')
+        self.assertEqual(flat["json>x>1>v"], "b")
+
+    def test_flatten_json_garbage(self) -> None:
+        self.assertEqual(probe.flatten_json("not json"), {})
+
+    def test_flatten_any_routes_by_shape(self) -> None:
+        self.assertEqual(
+            probe.flatten_any('{"a":"b"}'), probe.flatten_json('{"a":"b"}')
+        )
+        self.assertEqual(
+            probe.flatten_any("<envelope><a>b</a></envelope>"),
+            probe.flatten_xml("<envelope><a>b</a></envelope>"),
+        )
+
+    def test_build_json_request_shape(self) -> None:
+        import json
+
+        payload = json.loads(
+            probe.build_json_request("get.lock.status", "adminapp2", "cafe", True)
+        )
+        self.assertEqual(payload["header"]["username"], "adminapp2")
+        self.assertEqual(payload["header"]["password"], "cafe")
+        self.assertEqual(payload["header"]["passwordencode"], 1)
+        self.assertEqual(payload["header"]["security"], "username")
+        self.assertEqual(payload["body"]["command"], "get.lock.status")
+
+    def test_watch_commands_are_quads_with_formats(self) -> None:
+        for label, command, _content, fmt in probe.build_watch_commands():
+            self.assertTrue(label and command)
+            self.assertIn(fmt, ("xml", "json"))
+        labels = [c[0] for c in probe.build_watch_commands()]
+        self.assertIn("status", labels)
+        self.assertIn("jlock", labels)
+        self.assertIn("alarmrec", labels)
