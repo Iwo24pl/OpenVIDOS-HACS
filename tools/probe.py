@@ -252,6 +252,9 @@ def build_watch_commands() -> list[tuple[str, str, str]]:
     month = time.strftime("%m")
     return [
         ("status", "get.device.status", ""),
+        ("sysstat", "get.system.status", ""),
+        ("soundlight", "get.soundandlight.state", ""),
+        ("attach", "get.device.attachInfo", ""),
         ("lock", "get.lock.status", ""),
         ("live", "get.live.status", ""),
         ("tfcard", "get.tfcard.info", ""),
