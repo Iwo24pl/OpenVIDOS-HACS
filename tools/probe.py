@@ -112,9 +112,19 @@ def build_header_xml(username: str, password: str, passwordencode: bool) -> str:
 def build_status_request(
     username: str, password: str, passwordencode: bool = False
 ) -> bytes:
+    return build_request("get.device.status", username, password, passwordencode)
+
+
+def build_request(
+    command: str,
+    username: str,
+    password: str,
+    passwordencode: bool,
+    content: str = "",
+) -> bytes:
     return (
         f"{XML_PROLOG}<Envelope>"
-        f"<body><command>get.device.status</command></body>"
+        f"<body><command>{escape_xml(command)}</command>{content}</body>"
         f"{build_header_xml(username, password, passwordencode)}"
         f"</Envelope>"
     ).encode()
@@ -221,6 +231,37 @@ def diff_fields(
     return changes
 
 
+NOISE_FIELDS = ("datatime", "synctime")
+
+
+def _is_noise(key: str) -> bool:
+    """Clock fields change every poll - never interesting for ring detection."""
+    return key.split(">")[-1] in NOISE_FIELDS
+
+
+def build_watch_commands() -> list[tuple[str, str, str]]:
+    """``(label, command, content)`` probed every cycle by ``--watch``.
+
+    Goal: find a command whose response changes while the bell rings -
+    ``get.device.status`` was proven not to (2026-09-28 capture).
+    """
+    today = time.strftime("%Y-%m-%d 00:00:00")
+    return [
+        ("status", "get.device.status", ""),
+        ("lock", "get.lock.status", ""),
+        ("live", "get.live.status", ""),
+        (
+            "alarmrec",
+            "get.record.alarmrecord",
+            "<content><record>"
+            "<filetype>all</filetype><stream>all</stream>"
+            "<occurtype>event</occurtype><channel>1</channel>"
+            f"<timestamp>{today}</timestamp>"
+            "</record></content>",
+        ),
+    ]
+
+
 def watch_status(
     url: str,
     username: str,
@@ -229,41 +270,67 @@ def watch_status(
     seconds: int,
     timeout: float,
 ) -> int:
-    """Poll ``get.device.status`` every second and print changed fields.
+    """Poll several device commands every second and print changed fields.
 
-    Run it, then ring the bell - whatever the device reports during a ring
-    shows up here (which tells us the real field name for the doorbell).
+    Run it, then ring the bell - whichever command reacts is our doorbell
+    signal source.
     """
-    print(f"[watch] polling every 1s for {seconds}s - RING THE BELL NOW")
-    prev: dict[str, str] | None = None
+    commands = build_watch_commands()
+    print(
+        f"[watch] polling {len(commands)} commands every 1s for {seconds}s - "
+        "RING THE BELL NOW (ring each of your bells separately if you have two)"
+    )
+    prev_fields: dict[str, dict[str, str]] = {label: {} for label, _, _ in commands}
+    prev_raw: dict[str, str] = {label: "" for label, _, _ in commands}
+    first: dict[str, bool] = {label: True for label, _, _ in commands}
+    reported: set[str] = set()
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         stamp = time.strftime("%H:%M:%S")
-        try:
-            _status, body = post(
-                url,
-                build_status_request(username, password, passwordencode),
-                timeout,
-                verify=False,
-            )
-        except (urllib.error.URLError, TimeoutError, OSError, ssl.SSLError) as exc:
-            print(f"  [{stamp}] transport: {exc}")
-            time.sleep(1)
-            continue
-        if extract_error(body) != 0:
-            print(f"  [{stamp}] error={extract_error(body)} {describe_error(extract_error(body))}")
-            time.sleep(1)
-            continue
-        fields = flatten_xml(body)
-        if prev is None:
-            prev = fields
-            print(f"  [{stamp}] baseline: {len(fields)} fields")
-        else:
-            for key, old, new in diff_fields(prev, fields):
-                print(f"  [{stamp}] {key}: {old!r} -> {new!r}")
-            prev = fields
+        for label, command, content in commands:
+            try:
+                _status, body = post(
+                    url,
+                    build_request(
+                        command, username, password, passwordencode, content
+                    ),
+                    timeout,
+                    verify=False,
+                )
+            except (urllib.error.URLError, TimeoutError, OSError, ssl.SSLError) as exc:
+                if label not in reported:
+                    print(f"  [{stamp}] {label}: transport failure: {exc}")
+                    reported.add(label)
+                continue
+            error = extract_error(body)
+            if error != 0:
+                if label not in reported:
+                    print(
+                        f"  [{stamp}] {label}: error={error} "
+                        f"{describe_error(error)} body={body[:200]!r}"
+                    )
+                    reported.add(label)
+                continue
+            fields = {
+                key: value
+                for key, value in flatten_xml(body).items()
+                if not _is_noise(key)
+            }
+            if first[label]:
+                first[label] = False
+            else:
+                changes = diff_fields(prev_fields[label], fields)
+                for key, old, new in changes:
+                    print(f"  [{stamp}] [{label}] {key}: {old!r} -> {new!r}")
+                if not changes and body != prev_raw[label] and label != "status":
+                    print(f"  [{stamp}] [{label}] body changed: {body[:300]!r}")
+            prev_fields[label] = fields
+            prev_raw[label] = body
         time.sleep(1)
-    print("[watch] done - any changed field above is ring/call related")
+    print(
+        "[watch] done - anything printed above (besides baseline/status clock) "
+        "is a ring-related signal"
+    )
     return 0
 
 
@@ -336,8 +403,10 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=0,
         metavar="SECONDS",
-        help="after a successful status probe, poll every second for N seconds "
-        "and print changed fields (ring the bell while it runs)",
+        help="after a successful status probe, poll get.device.status / "
+        "get.lock.status / get.live.status / get.record.alarmrecord every "
+        "second for N seconds and print changed fields (ring the bell while "
+        "it runs)",
     )
     parser.add_argument(
         "--url",
