@@ -28,3 +28,6 @@ SERVICE_OPEN_DOOR = "open_door"
 ATTR_DEVICE_ID = "device_id"
 ATTR_DOOR = "door"
 ATTR_PASSWORD = "password"
+
+# Bus event fired once per doorbell press: f"{DOMAIN}.{EVENT_DOORBELL_RUNG}"
+EVENT_DOORBELL_RUNG = "doorbell_rung"

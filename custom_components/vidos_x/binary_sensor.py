@@ -21,8 +21,8 @@ async def async_setup_entry(
     """Set up binary sensors."""
     async_add_entities(
         [
-            VidosOnlineBinarySensor(entry),
-            VidosDoorbellBinarySensor(entry),
+            VidosOnlineBinarySensor(entry.runtime_data.coordinator, entry),
+            VidosDoorbellBinarySensor(entry.runtime_data.coordinator, entry),
         ]
     )
 

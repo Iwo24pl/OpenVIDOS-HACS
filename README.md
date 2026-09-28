@@ -15,7 +15,7 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 | Open door (`set.device.opendoor`) | `button.open_door` + `vidos_x.open_door` service | **verified on hardware** (sha256 unlock password) |
 | Device online status | `binary_sensor.status` | **verified on hardware** (local poll) |
 | Lock state | `sensor.lock_state` | verified field (`devicestatus.lockstatus`), model-dependent |
-| Doorbell / ring event | `binary_sensor.doorbell` | field identified (`devicestatus.calling`), not yet live-tested |
+| Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | field identified (`devicestatus.calling`), not yet live-tested |
 | Alarm arm/disarm | `switch.alarm_disarmed` (opt-in) | experimental |
 | Live video | `camera` via RTSP URL (opt-in) | requires RTSP/ONVIF on the device (unverified) |
 | Device discovery | cloud login (opt-in) | unverified (`vidos.qvcloud.net`) |
@@ -73,6 +73,14 @@ Notes:
 
 * For minimal latency set the poll interval option to **5 s** (a ring must be
   long enough to be caught by a poll; typical intercom calls are 20 s+).
+* `event.*_doorbell` (device class `doorbell`, event type `ring`) is the
+  stateless alternative — its state changes to a timestamp on every press:
+
+  ```yaml
+  trigger:
+    - platform: state
+      entity_id: event.your_intercom_doorbell
+  ```
 * `binary_sensor.*_doorbell` (plain state, `mdi:doorbell` icon) works too if you prefer
   state-based triggers; attribute `last_rung` holds the last ring timestamp.
 

@@ -18,8 +18,8 @@ async def async_setup_entry(
     """Set up sensors."""
     async_add_entities(
         [
-            VidosLockStateSensor(entry),
-            VidosLastErrorSensor(entry),
+            VidosLockStateSensor(entry.runtime_data.coordinator, entry),
+            VidosLastErrorSensor(entry.runtime_data.coordinator, entry),
         ]
     )
 

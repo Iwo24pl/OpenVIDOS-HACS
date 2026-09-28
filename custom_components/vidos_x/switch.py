@@ -22,7 +22,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the alarm switch (only when enabled in options)."""
-    async_add_entities([VidosAlarmDisarmSwitch(entry)])
+    async_add_entities([VidosAlarmDisarmSwitch(entry.runtime_data.coordinator, entry)])
 
 
 class VidosAlarmDisarmSwitch(VidosEntity, SwitchEntity):

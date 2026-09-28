@@ -11,12 +11,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .cgi import VidosCgiClient, VidosCgiConnectionError, VidosCgiError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, EVENT_DOORBELL_RUNG
 from .models import VidosStatus, ring_started
 
 _LOGGER = logging.getLogger(__name__)
-
-EVENT_DOORBELL_RUNG = "doorbell_rung"
 
 
 class VidosXCoordinator(DataUpdateCoordinator[VidosStatus]):

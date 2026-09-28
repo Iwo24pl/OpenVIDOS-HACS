@@ -23,7 +23,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the open-door button."""
-    async_add_entities([VidosOpenDoorButton(entry)])
+    async_add_entities([VidosOpenDoorButton(entry.runtime_data.coordinator, entry)])
 
 
 class VidosOpenDoorButton(VidosEntity, ButtonEntity):
