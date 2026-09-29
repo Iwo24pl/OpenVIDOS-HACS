@@ -15,7 +15,7 @@ Tested against an **IDS9483AW** door station (fw `V100.R001.A311.00.G0108.B018`)
 | Header variant | **`lan-hash`**: `username=adminapp2`, `password=sha256hex(first-contact password)`, `passwordencode=1`, `security=username` ✅ |
 | Secrets | two distinct: QR passcode (`authCode`) vs first-contact "initial password" (`device.password`); unlockPassword = authCode = first-contact password at add time ✅ |
 | `get.device.status` | `<error>0</error>`; content fields: `info.model`, `info.version`, `channel.id`, `devicestatus.calling` (ring), `devicestatus.lockstatus`, `devability`, `key`, `tdc` ✅ |
-| `set.device.opendoor` | `<error>0</error>` + relay click with content `door=0`, `locknumber=0`, `password=sha256hex(first-contact password)` (`DeviceUnlockContent` shape) ✅ |
+| `set.device.opendoor` | `<error>0</error>` with content `door=0`, `locknumber=0`, `password=sha256hex(first-contact password)` (`DeviceUnlockContent` shape) ✅ — *physical relay click never confirmed; (0,0) may map to no configured output* |
 | Error codes | `-10028` incorrect password, `-10029` busy (from `SDKStatus.java`) |
 | RTSP/ONVIF, cloud discovery | **not yet probed** (V2.0) |
 
@@ -157,12 +157,29 @@ cgiPort default: 443 (DEVICE_DEFAULT_CGI_PORT) / 80 (DEVICE_DEFAULT_CGI_HTTP_POR
 ### 3.1 Key CGI commands (verified constants)
 
 Door / lock:
-* `set.device.opendoor` — open door. Content (`OpenLockContent`/`DeviceUnlockContent`):
-  `channelNum`, `lockNum`, `password`. This is **the** command behind `openLock()`.
+* `set.device.opendoor` — open door. Content (`DeviceUnlockContent`, the app's main path):
+  `door` (= channel number), `locknumber` (= lock id), `password`. Legacy `OpenLockContent`
+  shape: `door` (= lock id) + `password` only. This is **the** command behind `openLock()`.
 * `set.opendoor.password` (set unlock password), `set.opendoor.checkpassword`
 * `get.lock.status` / `set.lock.status`, `get.auto.unlock` / `set.auto.unlock`
 * `set.temp.pwd` / `delete.temp.pwd` / `get.temp.pwd` (temporary door codes)
 * `set.qrcode.create` / `get.qrcode.info` (unlock QR codes), `set.smart.relay`
+
+**Lock enumeration via `get.device.attachInfo`** (hardware 2026-10-02; answered JSON in an XML
+envelope). `profile.subs` reports `lock total=3 enable=1`; `sub-devlist` lists them —
+`children` code-refs attach a lock to its channel, unreferenced locks are standalone:
+
+| code | name | channel (`door`) | lock id (`locknumber`) | note |
+|---|---|---|---|---|
+| `Lock_1_1` | DOOR1 | 1 | 1 | child of `Channel_1` (CAM1) |
+| `Lock_2_1` | DOOR2 | 2 | 1 | child of `Channel_2` (CAM2) |
+| `Gate_1` | **Automatic gate** | 0 | **2** | standalone (`CHANNEL_LOCK=0`); app uses a distinct icon for `subLock.id==2` (`device_attachment_lock2`) |
+
+App call chain: `DeviceAttachmentAdapter` → `onClick(subLock, 0, subChannel.getId())` →
+`MainDeviceListPresenter.deviceUnlock(device, door=channelId, lock=subLock.getId())` →
+`DeviceRequestHelp.deviceUnlock` → `set.device.opendoor`. Standalone locks pass
+`CHANNEL_LOCK = 0` as the channel. *Physical verification of each output pending — use
+`tools/probe.py --open-door --exact --door N --lock M` while standing at the output.*
 
 Status / info:
 * `get.device.status` (all info), `get.product.info`, `get.system.info`, `get.system.ability`,

@@ -171,6 +171,13 @@ class BuildRequestTests(unittest.TestCase):
         self.assertNotIn("first-contact-hash", labels)
         self.assertIn(2, [lock for _l, _v, lock, _s in attempts])
 
+    def test_door_attempt_exact_mode(self) -> None:
+        args = _args(password="pwd1", lock=2, exact=True)
+        attempts = probe.build_door_attempts(args)
+        self.assertEqual({lock for _l, _v, lock, _s in attempts}, {2})
+        self.assertEqual({shape for _l, _v, _lock, shape in attempts}, {"full"})
+        self.assertEqual(attempts[0][0], "first-contact-hash")
+
 
 class ResponseTests(unittest.TestCase):
     def test_extract_error(self) -> None:

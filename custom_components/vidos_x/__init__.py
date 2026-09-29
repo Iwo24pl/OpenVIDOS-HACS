@@ -19,6 +19,7 @@ from .cgi import DEFAULT_USERNAME, VidosCgiClient
 from .const import (
     ATTR_DEVICE_ID,
     ATTR_DOOR,
+    ATTR_LOCK,
     ATTR_PASSWORD,
     CONF_CGI_PORT,
     CONF_DEVICE_IP,
@@ -52,6 +53,7 @@ SERVICE_OPEN_DOOR_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional(ATTR_DOOR, default=0): cv.positive_int,
+        vol.Optional(ATTR_LOCK, default=0): cv.positive_int,
         vol.Optional(ATTR_PASSWORD, default=""): cv.string,
     }
 )
@@ -78,6 +80,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         await runtime.client.async_open_door(
             door=call.data.get(ATTR_DOOR, 0),
             password=call.data.get(ATTR_PASSWORD, ""),
+            lock=call.data.get(ATTR_LOCK, 0),
         )
 
     hass.services.async_register(

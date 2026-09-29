@@ -23,6 +23,8 @@ Examples:
   python tools/probe.py --host 192.168.1.50 --password "12345678" --save fixture.xml
   python tools/probe.py --host 192.168.1.50 --password "12345678" \
       --open-door --door 0 --unlock-password "9999"
+  python tools/probe.py --host 192.168.1.67 --password "12345678" \
+      --open-door --exact --door 0 --lock 2    # ONLY the gate output (actuates!)
 """
 
 from __future__ import annotations
@@ -484,6 +486,13 @@ def main(argv: list[str] | None = None) -> int:
         "from --password/--qr (raw + sha256, app ability-24 path)",
     )
     parser.add_argument(
+        "--exact",
+        action="store_true",
+        help="send only door=<--door> lock=<--lock> with the app's full shape "
+        "(no lock 0/1 fallback, no legacy shape) - use for targeted output tests "
+        "(e.g. gate = --door 0 --lock 2)",
+    )
+    parser.add_argument(
         "--watch",
         type=int,
         default=0,
@@ -641,11 +650,16 @@ def build_door_attempts(args: argparse.Namespace) -> list[tuple[str, str, int, s
             seen.add(value)
             unique.append((label, value))
 
-    locks = list(dict.fromkeys([args.lock, 0, 1]))
+    if getattr(args, "exact", False):
+        locks = [args.lock]
+        shapes = ["full"]
+    else:
+        locks = list(dict.fromkeys([args.lock, 0, 1]))
+        shapes = ["full", "legacy"]
     return [
         (label, value, lock, shape)
         for label, value in unique
-        for shape in ("full", "legacy")
+        for shape in shapes
         for lock in locks
     ]
 

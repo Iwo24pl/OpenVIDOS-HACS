@@ -80,8 +80,13 @@
           "description": "Docelowe urządzenie Vidos X."
         },
         "door": {
-          "name": "Drzwi",
-          "description": "Numer drzwi / zamka.",
+          "name": "Drzwi (kanał)",
+          "description": "Kanał, do którego należy zamek: 1 = CAM1/DOOR1, 2 = CAM2/DOOR2, 0 = wyjścia samodzielne (brama).",
+          "example": "0"
+        },
+        "lock": {
+          "name": "Zamek",
+          "description": "Identyfikator zamka z get.device.attachInfo: 0 = domyślny, 1 = drzwi, 2 = brama automatyczna.",
           "example": "0"
         },
         "password": {

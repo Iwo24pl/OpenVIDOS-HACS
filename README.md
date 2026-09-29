@@ -45,7 +45,18 @@ Options (per device): poll interval, TLS verification, LAN ring detection
 (on by default), door password, RTSP stream URL (enables the camera entity),
 experimental alarm switch.
 
-Service `vidos_x.open_door` targets one or more devices by `device_id`.
+Service `vidos_x.open_door` targets one or more devices by `device_id`. The
+`door`/`lock` fields map to the device's lock table (`get.device.attachInfo`):
+
+| Output | `door` (channel) | `lock` |
+|---|---|---|
+| DOOR1 (CAM1) | 1 | 1 |
+| DOOR2 (CAM2) | 2 | 1 |
+| **Automatic gate** | 0 | 2 |
+
+Defaults (`door: 0`, `lock: 0`) reproduce the Phase 0 test. Per-output physical
+verification is pending (each test actuates the output) — see
+`docs/VIDOS_X_PROTOCOL.md` §3.1.
 
 ## Doorbell notifications
 

@@ -13,6 +13,12 @@ open_door:
         number:
           min: 0
           max: 16
+    lock:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 16
     password:
       example: "1234"
       selector:
