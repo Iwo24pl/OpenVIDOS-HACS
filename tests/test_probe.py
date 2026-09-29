@@ -281,3 +281,9 @@ class JsonProtocolTests(unittest.TestCase):
         self.assertIn("status", labels)
         self.assertIn("jlock", labels)
         self.assertIn("alarmrec", labels)
+
+    def test_noise_filters_clocks_and_audio_uptime(self) -> None:
+        self.assertTrue(probe._is_noise("envelope>body>content>time>datatime"))
+        self.assertTrue(probe._is_noise("envelope>body>content>synctime"))
+        self.assertTrue(probe._is_noise("json>body>content>session"))
+        self.assertFalse(probe._is_noise("json>body>content>calling"))

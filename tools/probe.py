@@ -269,11 +269,15 @@ def diff_fields(
     return changes
 
 
-NOISE_FIELDS = ("datatime", "synctime")
+NOISE_FIELDS = ("datatime", "synctime", "session")
 
 
 def _is_noise(key: str) -> bool:
-    """Clock fields change every poll - never interesting for ring detection."""
+    """Clock/counter fields change every poll - never interesting for ring detection.
+
+    ``session`` is ``get.audio.session``'s value: device uptime in milliseconds
+    (verified 2026-09-29: +~1000/s continuously, ring-independent).
+    """
     return key.split(">")[-1] in NOISE_FIELDS
 
 
