@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
@@ -21,17 +22,23 @@ from .const import (
     ATTR_DOOR,
     ATTR_LOCK,
     ATTR_PASSWORD,
+    CONF_CAMERAS,
+    CONF_CAMERAS_ORIGINAL,
     CONF_CGI_PORT,
+    CONF_DEFAULT_DOOR,
+    CONF_DEFAULT_LOCK,
     CONF_DEVICE_IP,
     CONF_DEVICE_PASSWORD,
+    CONF_DEVICE_UID,
     CONF_DEVICE_USERNAME,
     CONF_ENABLE_ALARM_SWITCH,
     CONF_ENABLE_LAN_RUNG,
-    CONF_RTSP_URL,
     CONF_SCHEME,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
+    DEFAULT_DOOR,
     DEFAULT_ENABLE_LAN_RUNG,
+    DEFAULT_LOCK,
     DOMAIN,
     SERVICE_OPEN_DOOR,
 )
@@ -43,7 +50,6 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
-    Platform.CAMERA,
     Platform.EVENT,
     Platform.SENSOR,
     Platform.SWITCH,
@@ -52,8 +58,8 @@ PLATFORMS: list[Platform] = [
 SERVICE_OPEN_DOOR_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional(ATTR_DOOR, default=0): cv.positive_int,
-        vol.Optional(ATTR_LOCK, default=0): cv.positive_int,
+        vol.Optional(ATTR_DOOR): cv.positive_int,
+        vol.Optional(ATTR_LOCK): cv.positive_int,
         vol.Optional(ATTR_PASSWORD, default=""): cv.string,
     }
 )
@@ -76,11 +82,17 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the domain (registers shared services)."""
 
     async def _async_handle_open_door(call: ServiceCall) -> None:
-        runtime = _resolve_runtime(hass, call)
+        entry, runtime = _resolve_entry_and_runtime(hass, call)
+        door = call.data.get(
+            ATTR_DOOR, entry.options.get(CONF_DEFAULT_DOOR, DEFAULT_DOOR)
+        )
+        lock = call.data.get(
+            ATTR_LOCK, entry.options.get(CONF_DEFAULT_LOCK, DEFAULT_LOCK)
+        )
         await runtime.client.async_open_door(
-            door=call.data.get(ATTR_DOOR, 0),
+            door=door,
             password=call.data.get(ATTR_PASSWORD, ""),
-            lock=call.data.get(ATTR_LOCK, 0),
+            lock=lock,
         )
 
     hass.services.async_register(
@@ -92,8 +104,10 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     return True
 
 
-def _resolve_runtime(hass: HomeAssistant, call: ServiceCall) -> VidosRuntimeData:
-    """Map ``device_id`` service targets onto integration runtime data."""
+def _resolve_entry_and_runtime(
+    hass: HomeAssistant, call: ServiceCall
+) -> tuple[VidosConfigEntry, VidosRuntimeData]:
+    """Map ``device_id`` service targets onto config entry + runtime data."""
     dev_reg = dr.async_get(hass)
     for device_id in call.data[ATTR_DEVICE_ID]:
         device = dev_reg.async_get(device_id)
@@ -102,7 +116,7 @@ def _resolve_runtime(hass: HomeAssistant, call: ServiceCall) -> VidosRuntimeData
         for entry_id in device.config_entries:
             entry = hass.config_entries.async_get_entry(entry_id)
             if entry is not None and entry.domain == DOMAIN and entry.runtime_data:
-                return entry.runtime_data
+                return entry, entry.runtime_data
     raise HomeAssistantError("No matching Vidos X device found for this service call")
 
 
@@ -111,9 +125,53 @@ def _platforms_for_entry(entry: ConfigEntry) -> list[Platform]:
     platforms = list(PLATFORMS)
     if not entry.options.get(CONF_ENABLE_ALARM_SWITCH, False):
         platforms.remove(Platform.SWITCH)
-    if not entry.options.get(CONF_RTSP_URL):
-        platforms.remove(Platform.CAMERA)
     return platforms
+
+
+async def _async_associate_cameras(hass: HomeAssistant, entry: VidosConfigEntry) -> None:
+    """Attach picked camera entities to this device (association, not restream).
+
+    The entity registry entry of each selected camera is re-pointed at the
+    Vidos device so it shows up on the intercom's device page. The original
+    ``device_id`` is remembered in options and restored when the camera is
+    unselected.
+    """
+    entity_reg = er.async_get(hass)
+    dev_reg = dr.async_get(hass)
+    uid = (
+        entry.data.get(CONF_DEVICE_UID) or entry.data.get(CONF_DEVICE_IP) or entry.entry_id
+    )
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, uid)})
+    if device is None:
+        return
+
+    picked = list(entry.options.get(CONF_CAMERAS) or [])
+    original: dict[str, str | None] = dict(entry.options.get(CONF_CAMERAS_ORIGINAL) or {})
+    changed = False
+
+    for entity_id, orig_device in list(original.items()):
+        if entity_id in picked:
+            continue
+        registry_entry = entity_reg.async_get(entity_id)
+        if registry_entry is not None and registry_entry.device_id != orig_device:
+            entity_reg.async_update_entity(entity_id, device_id=orig_device)
+        original.pop(entity_id)
+        changed = True
+
+    for entity_id in picked:
+        registry_entry = entity_reg.async_get(entity_id)
+        if registry_entry is None:
+            continue
+        if entity_id not in original:
+            original[entity_id] = registry_entry.device_id
+            changed = True
+        if registry_entry.device_id != device.id:
+            entity_reg.async_update_entity(entity_id, device_id=device.id)
+
+    if changed:
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_CAMERAS_ORIGINAL: original}
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> bool:
@@ -151,6 +209,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> boo
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    await _async_associate_cameras(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 

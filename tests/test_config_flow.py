@@ -32,14 +32,12 @@ if HOME_ASSISTANT:
 
     @pytest.mark.asyncio
     async def test_manual_flow_starts(hass) -> None:
-        """Manual flow should render the setup form."""
+        """User step should render the manual connection form (cloud UI removed)."""
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         assert result["type"] == "form"
-        assert result["step_id"] == "user"
-        # NOTE: full flow coverage is planned together with recorded device
-        # fixtures from Phase 0 (mocking VidosCgiClient / cloud responses).
+        assert result["step_id"] == "manual"
 
 
 class ConfigFlowAvailabilityTests(unittest.TestCase):

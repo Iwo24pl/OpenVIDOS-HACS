@@ -1,29 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "Konfiguracja Vidos X",
-        "description": "Dodaj domofon / stację bramową Vidos X.",
-        "data": {
-          "mode": "Tryb konfiguracji"
-        },
-        "data_description": {
-          "mode": "Ręcznie: znasz adres IP urządzenia. Chmurowo: zaloguj się kontem Vidos X, aby wyszukać urządzenia."
-        }
-      },
-      "cloud": {
-        "title": "Konto Vidos X",
-        "data": {
-          "username": "Konto (e-mail / telefon)",
-          "password": "Hasło"
-        }
-      },
-      "select_device": {
-        "title": "Wybierz urządzenie",
-        "data": {
-          "device_uid": "Urządzenie"
-        }
-      },
       "manual": {
         "title": "Połączenie z urządzeniem",
         "data": {
@@ -42,9 +19,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Nie można połączyć się z urządzeniem lub chmurą",
-      "invalid_auth": "Logowanie odrzucone",
-      "no_devices": "Nie znaleziono urządzeń na koncie",
+      "cannot_connect": "Nie można połączyć się z urządzeniem",
       "unknown": "Nieoczekiwany błąd"
     },
     "abort": {
@@ -61,11 +36,15 @@
           "enable_alarm_switch": "Włącz przełącznik uzbrojenia alarmu (eksperymentalny)",
           "enable_lan_rung": "Wykrywanie dzwonka przez broadcast LAN",
           "door_password": "Hasło otwierania drzwi",
-          "rtsp_url": "Adres strumienia RTSP"
+          "default_door": "Przycisk otwierania - drzwi (kanał)",
+          "default_lock": "Przycisk otwierania - identyfikator zamka",
+          "cameras": "Powiązane kamery"
         },
         "data_description": {
-          "rtsp_url": "np. rtsp://192.168.1.50:554/stream1 - włącza encję kamery.",
-          "door_password": "Hasło odblokowania do set.device.opendoor. Puste = użyj hasła urządzenia (wysyłane jako SHA-256)."
+          "door_password": "Hasło odblokowania do set.device.opendoor. Puste = użyj hasła urządzenia (wysyłane jako SHA-256).",
+          "default_door": "Kanał używany przez przycisk Otwórz drzwi i domyślnie w usłudze. 1 = CAM1/DOOR1 (zweryfikowano), 2 = CAM2/DOOR2, 0 = wyjścia samodzielne (brama).",
+          "default_lock": "Identyfikator zamka używany przez przycisk Otwórz drzwi i domyślnie w usłudze. 1 = drzwi (zweryfikowano), 2 = brama automatyczna, 0 = domyślny.",
+          "cameras": "Encje kamer z innych integracji powiązane z tym domofonem: pojawiają się na stronie urządzenia (bez restreamu)."
         }
       }
     }
@@ -81,13 +60,13 @@
         },
         "door": {
           "name": "Drzwi (kanał)",
-          "description": "Kanał, do którego należy zamek: 1 = CAM1/DOOR1, 2 = CAM2/DOOR2, 0 = wyjścia samodzielne (brama).",
-          "example": "0"
+          "description": "Kanał, do którego należy zamek: 1 = CAM1/DOOR1, 2 = CAM2/DOOR2, 0 = wyjścia samodzielne (brama). Pominięcie = ustawiony domyślny.",
+          "example": "1"
         },
         "lock": {
           "name": "Zamek",
-          "description": "Identyfikator zamka z get.device.attachInfo: 0 = domyślny, 1 = drzwi, 2 = brama automatyczna.",
-          "example": "0"
+          "description": "Identyfikator zamka z get.device.attachInfo: 0 = domyślny, 1 = drzwi, 2 = brama automatyczna. Pominięcie = ustawiony domyślny.",
+          "example": "1"
         },
         "password": {
           "name": "Hasło",

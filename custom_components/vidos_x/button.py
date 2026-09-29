@@ -11,7 +11,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .cgi import VidosCgiError
-from .const import CONF_DEVICE_PASSWORD, CONF_DOOR_PASSWORD
+from .const import (
+    CONF_DEFAULT_DOOR,
+    CONF_DEFAULT_LOCK,
+    CONF_DEVICE_PASSWORD,
+    CONF_DOOR_PASSWORD,
+    DEFAULT_DOOR,
+    DEFAULT_LOCK,
+)
 from .entity import VidosEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,8 +43,12 @@ class VidosOpenDoorButton(VidosEntity, ButtonEntity):
         password = self._entry.options.get(
             CONF_DOOR_PASSWORD, self._entry.data.get(CONF_DEVICE_PASSWORD, "")
         )
+        door = self._entry.options.get(CONF_DEFAULT_DOOR, DEFAULT_DOOR)
+        lock = self._entry.options.get(CONF_DEFAULT_LOCK, DEFAULT_LOCK)
         try:
-            await self.coordinator.client.async_open_door(password=password)
+            await self.coordinator.client.async_open_door(
+                door=door, lock=lock, password=password
+            )
         except VidosCgiError as err:
             raise HomeAssistantError(f"Opening the door failed: {err}") from err
         await self.coordinator.async_request_refresh()

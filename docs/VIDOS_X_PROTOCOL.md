@@ -15,9 +15,9 @@ Tested against an **IDS9483AW** door station (fw `V100.R001.A311.00.G0108.B018`)
 | Header variant | **`lan-hash`**: `username=adminapp2`, `password=sha256hex(first-contact password)`, `passwordencode=1`, `security=username` ✅ |
 | Secrets | two distinct: QR passcode (`authCode`) vs first-contact "initial password" (`device.password`); unlockPassword = authCode = first-contact password at add time ✅ |
 | `get.device.status` | `<error>0</error>`; content fields: `info.model`, `info.version`, `channel.id`, `devicestatus.calling` (ring), `devicestatus.lockstatus`, `devability`, `key`, `tdc` ✅ |
-| `set.device.opendoor` | `<error>0</error>` with content `door=0`, `locknumber=0`, `password=sha256hex(first-contact password)` (`DeviceUnlockContent` shape) ✅ — *physical relay click never confirmed; (0,0) may map to no configured output* |
+| `set.device.opendoor` | `<error>0</error>` + **physical relay actuation confirmed** with content `door=1`, `locknumber=1`, `password=sha256hex(first-contact password)` (`DeviceUnlockContent` shape) ✅ 2026-10-02. Note: the device returns `error=0` even for pairs with no configured output (e.g. `door=0, lock=0`) — `error=0` alone does not prove actuation. |
 | Error codes | `-10028` incorrect password, `-10029` busy (from `SDKStatus.java`) |
-| RTSP/ONVIF, cloud discovery | **not yet probed** (V2.0) |
+| RTSP/ONVIF, cloud discovery | RTSP/ONVIF **probed absent** (§4, 2026-10-02); cloud discovery UI removed (`cloud.py` kept) |
 
 ---
 
@@ -171,15 +171,16 @@ envelope). `profile.subs` reports `lock total=3 enable=1`; `sub-devlist` lists t
 
 | code | name | channel (`door`) | lock id (`locknumber`) | note |
 |---|---|---|---|---|
-| `Lock_1_1` | DOOR1 | 1 | 1 | child of `Channel_1` (CAM1) |
+| `Lock_1_1` | DOOR1 | 1 | 1 | child of `Channel_1` (CAM1) — **physically verified 2026-10-02** |
 | `Lock_2_1` | DOOR2 | 2 | 1 | child of `Channel_2` (CAM2) |
 | `Gate_1` | **Automatic gate** | 0 | **2** | standalone (`CHANNEL_LOCK=0`); app uses a distinct icon for `subLock.id==2` (`device_attachment_lock2`) |
 
 App call chain: `DeviceAttachmentAdapter` → `onClick(subLock, 0, subChannel.getId())` →
 `MainDeviceListPresenter.deviceUnlock(device, door=channelId, lock=subLock.getId())` →
 `DeviceRequestHelp.deviceUnlock` → `set.device.opendoor`. Standalone locks pass
-`CHANNEL_LOCK = 0` as the channel. *Physical verification of each output pending — use
-`tools/probe.py --open-door --exact --door N --lock M` while standing at the output.*
+`CHANNEL_LOCK = 0` as the channel. *Physical verification: DOOR1 done (2026-10-02);
+gate `(0,2)` accepted with `error=0` but not yet heard to actuate — re-test with
+`tools/probe.py --open-door --exact --door 0 --lock 2` while standing at the gate.*
 
 Status / info:
 * `get.device.status` (all info), `get.product.info`, `get.system.info`, `get.system.ability`,
@@ -253,17 +254,40 @@ network).
 
 ---
 
-## 4. Live video / snapshot
+## 4. Live video / snapshot (hardware-probed 2026-10-02)
 
-* App live view and snapshots go through the **P2P SDK** (`libqv-p2p-v2.so`) + player
-  (`QvPlayerCore.snapShot()` JNI) — proprietary, not directly usable from Home Assistant.
-* `device_list`/binding models expose `ip`, `cgiPort`, `mac`, `status`, `port` — so the LAN
-  address needed for direct streaming is available from the cloud device list.
-* **ONVIF/RTSP is the practical HA route**: devices support ONVIF password management over CGI
-  and report `onvifSupport`. Expect `rtsp://<ip>:554/...` and ONVIF on 80/8899 — **VERIFY on
-  hardware** (nmap + ONVIF discovery, try credentials from `get.onvif.pwd`).
-* Native `liblive_player.so` contains a full RTSP server/client + ONVIF config parser
-  (`<port>`, device CGI XML, `addPresetByCgi`, `snapShot`) — same codebase is used device-side.
+**Result: no standard video protocol is available on this firmware.**
+
+Port scan (TCP, full range) of the IDS9483AW: **`443` (CGI), `34567`
+(proprietary media), `8765` (unknown binary protocol)** — `554`, `8000`,
+`8899` and HTTP are closed/refusing.
+
+* `get.network.base` / `get.network.config` (both dialects) → `error=-10`
+  (firmware does not implement them — no `rtspport`/`rtspurl` to read).
+* `get.onvif.pwd` (JSON) → `error=-10`; `get.system.ability` (XML) → `error=0`
+  but **empty content** (no `<rtsp><preview>` / `ability_rtsp`).
+* Raw probes: RTSP `OPTIONS`, HTTP, ONVIF `GetCapabilities` against 8765/34567
+  → not those protocols. Port **8765 answered with an unknown binary frame**
+  (`0a 00 01 00 00 00 ee 26 …`); port **34567** accepts TCP and waits
+  (media port).
+* The app's live view uses the native `live_player` over
+  `quii://<user>[:<sha256pass>]@<ip>:<streamPort>/mode=real&idc=<ch>&ids=<stream>[&tls=1]`
+  (`QvPlayerCore:3127-3147`, default `DEVICE_DEFAULT_STEAM_PORT = 34567`,
+  user `adminapp2`, TLS media port from LAN discovery). Session decryption key
+  comes from `get.device.streamkey` (XML — works: returns `key`/`tdc`, same
+  values as `get.device.status`).
+* App snapshots are decoded client-side (`QvPlayerCore.snapShot()` JNI) — no
+  HTTP snapshot/JPEG endpoint exists anywhere in the Java layer.
+
+**Implication for HA:** no RTSP/ONVIF/snapshot URL can be configured — the
+RTSP URL option was removed; cameras from other integrations are *associated*
+with the device instead (options → "Associated cameras"). Viable future routes:
+reverse-engineer `quii://` (ports 34567/8765 suggest direct LAN streaming),
+or an add-on wrapping the ARM `live_player` lib.
+
+Prior (static-only) expectations for ONVIF/RTSP (`get.onvif.pwd` command,
+`onvifSupport` fields in `get.encode`) are **not realized by this firmware** —
+the app has no UI caller for them either.
 
 ---
 
@@ -280,11 +304,12 @@ network).
                                  │  (device maintains its own cloud link)
    LAN  ┌────────────────────────▼─────────────────────────────────────────┐
         │  Door station / camera                                          │
-        │  http(s)://<ip>:<cgiPort>/tdkcgi   ← XML/JSON CGI, door open,   │
-        │       status, ONVIF pwd, config (this is what the app uses)     │
-        │  RTSP :554 / ONVIF            ← for video (VERIFY)             │
-        │  P2P (native lib)             ← app's live view, not for HA    │
-        └─────────────────────────────────────────────────────────────────┘
+        │  http(s)://<ip>:<cgiPort>/tdkcgi   ← XML/JSON CGI, door open,       │
+        │       status, config (this is what the app uses)                   │
+        │  :34567 quii:// media + :8765 binary  ← video (proprietary, no     │
+        │       RTSP/ONVIF — probed 2026-10-02)                              │
+        │  P2P (native lib)             ← app's cloud fallback, not for HA   │
+        └─────────────────────────────────────────────────────────────────────┘
 ```
 
 Practical consequences:
@@ -292,9 +317,9 @@ Practical consequences:
    network). The cloud is *not* used as a relay for control commands — `openLock()` builds a
    Retrofit client on `ip:cgiPort`.
 2. Cloud access is needed to: discover devices (ip/cgiPort/dynamic password), learn online
-   status, and read alarm/ring records.
-3. Video: ONVIF/RTSP if enabled; otherwise P2P-only (would need an add-on with the native lib —
-   not realistic, 32-bit ARM lib only).
+   status, and read alarm/ring records — **UI removed for now, `cloud.py` kept**.
+3. Video: **no RTSP/ONVIF** (probed) — only the proprietary `quii://` media port; associate
+   external camera entities instead (integration options).
 
 ---
 
@@ -313,7 +338,9 @@ Practical consequences:
 
 1. Capture one app session (`mitmproxy` with the bundled CA, or device-side tcpdump) to confirm:
    the exact envelope XML, password hashing (`usernametoken`), and whether `IS_OPEN_AUTH` is on.
-2. Confirm ONVIF/RTSP ports and stream URLs; test credentials from `get.onvif.pwd`.
+2. ~~Confirm ONVIF/RTSP ports~~ **done 2026-10-02: none exist** (see §4);
+   remaining: identify the binary protocol on port 8765 and the exact
+   `quii://` handshake on 34567.
 3. Confirm which cloud region host `vidos.qvcloud.net` resolves to for EU users and whether
    service type 0/1 addresses are subdomains of it.
 4. Confirm ring/alarm delivery: FCM only, or also a server-pushed down-channel event?

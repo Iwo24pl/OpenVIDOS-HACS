@@ -12,8 +12,11 @@ CONF_SCHEME = "scheme"
 CONF_VERIFY_SSL = "verify_ssl"
 CONF_ENABLE_ALARM_SWITCH = "enable_alarm_switch"
 CONF_ENABLE_LAN_RUNG = "enable_lan_rung"
-CONF_RTSP_URL = "rtsp_url"
+CONF_CAMERAS = "cameras"
+CONF_CAMERAS_ORIGINAL = "cameras_original"
 CONF_DOOR_PASSWORD = "door_password"
+CONF_DEFAULT_DOOR = "default_door"
+CONF_DEFAULT_LOCK = "default_lock"
 CONF_MODEL = "model"
 CONF_SOURCE = "source"
 
@@ -25,6 +28,10 @@ DEFAULT_SCAN_INTERVAL = 10
 MIN_SCAN_INTERVAL = 5
 MAX_SCAN_INTERVAL = 3600
 DEFAULT_ENABLE_LAN_RUNG = True
+
+# Physically verified output for IDS9483AW: door=1 (CAM1), lock=1 (DOOR1).
+DEFAULT_DOOR = 1
+DEFAULT_LOCK = 1
 
 # How long the doorbell binary sensor stays ON after a ring event.
 DOORBELL_ON_SECONDS = 15

@@ -6,7 +6,9 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 > **Status: Phase 0 verified (V1.0).** The status poll and door-open commands were
 > validated on real hardware (IDS9483AW): header `adminapp2` + `sha256(password)` +
 > `passwordencode=1`, unlock content `door`+`locknumber`+`password=sha256(...)`.
-> Video (RTSP/ONVIF) and cloud discovery remain unverified (V2.0).
+> **Video: the device exposes no RTSP/ONVIF** — only the proprietary `quii://`
+> media port 34567 (see *Video* below). Cloud discovery lives in `cloud.py`
+> (backend kept, removed from the setup UI).
 
 ## Features
 
@@ -17,8 +19,9 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 | Lock state | `sensor.lock_state` | verified field (`devicestatus.lockstatus`), model-dependent |
 | Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | **LAN broadcast verified on hardware** (Azeno scan/reply, ~6 s after ring); status-flag path kept as fallback |
 | Alarm arm/disarm | `switch.alarm_disarmed` (opt-in) | experimental |
-| Live video | `camera` via RTSP URL (opt-in) | requires RTSP/ONVIF on the device (unverified) |
-| Device discovery | cloud login (opt-in) | unverified (`vidos.qvcloud.net`) |
+| Live video | *none* (device speaks proprietary `quii://` only) | see *Video* below |
+| Associated cameras | camera entities from other integrations attached to the device page | options: pick entities (multiple) |
+| Device discovery | cloud login | **removed from the UI** (`cloud.py` kept for later) |
 
 Everything except discovery runs **locally**: the integration talks
 `https://<device-ip>:443/tdkcgi` directly. No cloud account is required if you add
@@ -38,15 +41,17 @@ directory and restart.
 * **Manual** – device IP, CGI port (443/80), device username (default `adminapp2`,
   verified) and first-contact password (sent as `sha256` + `passwordencode=1`).
   Scheme `https`/`http`, TLS verification toggle (off for self-signed certs).
-* **Cloud account** – Vidos X app credentials used only to *discover* devices
-  (IP / port / dynamic password). Unverified.
+  This is the only setup path; cloud discovery was removed from the UI
+  (the backend in `cloud.py` is kept for later).
 
 Options (per device): poll interval, TLS verification, LAN ring detection
-(on by default), door password, RTSP stream URL (enables the camera entity),
-experimental alarm switch.
+(on by default), door password, open-button output (`default_door` /
+`default_lock`, default `1`/`1` = the verified DOOR1 output), associated
+camera entities (multiple, from other integrations), experimental alarm switch.
 
 Service `vidos_x.open_door` targets one or more devices by `device_id`. The
-`door`/`lock` fields map to the device's lock table (`get.device.attachInfo`):
+`door`/`lock` fields map to the device's lock table (`get.device.attachInfo`);
+when omitted they fall back to the configured defaults:
 
 | Output | `door` (channel) | `lock` |
 |---|---|---|
@@ -54,9 +59,9 @@ Service `vidos_x.open_door` targets one or more devices by `device_id`. The
 | DOOR2 (CAM2) | 2 | 1 |
 | **Automatic gate** | 0 | 2 |
 
-Defaults (`door: 0`, `lock: 0`) reproduce the Phase 0 test. Per-output physical
-verification is pending (each test actuates the output) — see
-`docs/VIDOS_X_PROTOCOL.md` §3.1.
+**DOOR1 (`door: 1`, `lock: 1`) is physically verified** — it is now the default
+for the button and the service. `DOOR2` and the gate are accepted (`error=0`)
+but not yet heard to actuate — see `docs/VIDOS_X_PROTOCOL.md` §3.1.
 
 ## Doorbell notifications
 
@@ -109,6 +114,24 @@ Notes:
   after each ring; attribute `last_rung` holds the last ring timestamp.
 * Debug the LAN chain standalone with `python tools/lanwatch.py`.
 
+## Video
+
+**The station exposes no standard video protocol on the LAN** (probed
+2026-10-02): port scan shows only `443` (CGI), `34567` (proprietary media) and
+`8765` (unknown binary protocol); `554`, ONVIF ports and HTTP are closed;
+`get.network.base`/`get.network.config`/`get.onvif.pwd` all answer `error=-10`
+(firmware does not implement them). The official app streams over
+`quii://adminapp2:<sha256(auth)>@<ip>:34567/mode=real&idc=..&ids=..` via its
+native `live_player` library — not consumable by Home Assistant.
+
+Practical options for showing the door view in HA:
+
+1. Use a camera from another integration (IP cam / NVR pointed at the door) and
+   **associate it** in the options — it appears on the intercom's device page
+   (association only, no restream).
+2. Reverse-engineer `quii://` (long-term; open ports 34567/8765 suggest direct
+   LAN streaming is possible in principle).
+
 ## Development
 
 ```bash
@@ -127,8 +150,10 @@ implementation plan in [`docs/HACS_INTEGRATION_PLAN.md`](docs/HACS_INTEGRATION_P
    `adminapp2` + `sha256(password)` + `passwordencode=1`.
 2. ✅ `set.device.opendoor` reply `<error>0</error>` (content: `door`, `locknumber`,
    `password=sha256(unlock password)`).
-3. Scan the device for RTSP/ONVIF (`554`, ONVIF ports) and set the RTSP URL option *(V2.0)*.
-4. Validate cloud discovery responses (`get-device-list`) if you use cloud mode *(V2.0)*.
+3. ✅ Video probe: no RTSP/ONVIF on this firmware — `554`/ONVIF ports closed,
+   `get.network.base`, `get.network.config`, `get.onvif.pwd` → `error=-10`;
+   media only via proprietary port 34567 (`quii://`, native `live_player`).
+4. Cloud discovery UI removed; `cloud.py` backend kept for a later release.
 
 ## Security notes
 
