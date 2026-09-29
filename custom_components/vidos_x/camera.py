@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import tempfile
 import time
 
 from homeassistant.components.camera import Camera
@@ -18,6 +19,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .cgi import VidosCgiError
 from .const import (
     CONF_DEVICE_IP,
     CONF_DEVICE_USERNAME,
@@ -74,8 +76,12 @@ class VidosXCamera(VidosEntity, Camera):
                 return self._jpeg
             try:
                 jpeg = await self._async_snapshot()
-            except QuiiError as err:
+            except (QuiiError, VidosCgiError) as err:
                 _LOGGER.warning("Vidos X snapshot failed: %s", err)
+                self._cooldown_until = time.monotonic() + SNAPSHOT_COOLDOWN_SECONDS
+                return self._jpeg
+            except Exception:  # noqa: BLE001 - a camera must never raise 500s
+                _LOGGER.exception("Vidos X snapshot failed unexpectedly")
                 self._cooldown_until = time.monotonic() + SNAPSHOT_COOLDOWN_SECONDS
                 return self._jpeg
             if jpeg is None:
@@ -127,11 +133,14 @@ class VidosXCamera(VidosEntity, Camera):
         return key
 
     async def _async_decode(self, annexb: bytes) -> bytes | None:
-        """Decode raw annex-B H.264 to JPEG using Home Assistant's ffmpeg."""
-        uid = self._attr_unique_id or "vidos_x"
-        path = os.path.join(
-            self.hass.config.temp_dir, f"vidos_x_{uid.replace('-', '_')}.h264"
-        )
+        """Decode raw annex-B H.264 to JPEG using Home Assistant's ffmpeg.
+
+        Uses a plain ``tempfile`` file: Config's temp-dir attribute was
+        removed from current HA cores and raised AttributeError -> HTTP 500.
+        """
+        uid = (self._attr_unique_id or "vidos_x").replace("-", "_")
+        fd, path = tempfile.mkstemp(prefix=f"vidos_x_{uid}_", suffix=".h264")
+        os.close(fd)
         try:
             with open(path, "wb") as handle:
                 handle.write(annexb)

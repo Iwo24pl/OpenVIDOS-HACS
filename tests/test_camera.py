@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from _load import load_module
+from _load import PKG_DIR, load_module
 
 const = load_module("const")
 
@@ -36,6 +36,11 @@ class CameraConstTests(unittest.TestCase):
             const.SNAPSHOT_TIMEOUT_SECONDS, const.SNAPSHOT_TTL_SECONDS
         )
         self.assertGreater(const.STREAM_KEY_CACHE_SECONDS, 0)
+
+    def test_camera_avoids_removed_ha_apis(self) -> None:
+        """``hass.config.temp_dir`` was removed from HA core (500 regression)."""
+        source = (PKG_DIR / "camera.py").read_text(encoding="utf-8")
+        self.assertNotIn("config.temp_dir", source)
 
 
 if HOME_ASSISTANT:

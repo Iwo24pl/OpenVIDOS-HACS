@@ -33,7 +33,7 @@ DEFAULT_ENABLE_CAMERA = True
 
 # Snapshot camera (QUII media port, docs/VIDOS_X_PROTOCOL.md §4)
 SNAPSHOT_TTL_SECONDS = 5  # reuse a freshly grabbed JPEG for this long
-SNAPSHOT_TIMEOUT_SECONDS = 10  # whole session: connect + first keyframe
+SNAPSHOT_TIMEOUT_SECONDS = 7  # whole session; must fit the camera view's 10 s
 SNAPSHOT_COOLDOWN_SECONDS = 15  # back off after a failed snapshot
 STREAM_KEY_CACHE_SECONDS = 3600  # re-fetch get.device.streamkey rarely
 
