@@ -23,12 +23,14 @@ from .const import (
     CONF_DEVICE_USERNAME,
     CONF_DOOR_PASSWORD,
     CONF_ENABLE_ALARM_SWITCH,
+    CONF_ENABLE_LAN_RUNG,
     CONF_MODEL,
     CONF_RTSP_URL,
     CONF_SCHEME,
     CONF_SOURCE,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
+    DEFAULT_ENABLE_LAN_RUNG,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MAX_SCAN_INTERVAL,
@@ -259,6 +261,12 @@ class VidosXOptionsFlow(OptionsFlow):
                     vol.Required(
                         CONF_ENABLE_ALARM_SWITCH,
                         default=options.get(CONF_ENABLE_ALARM_SWITCH, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_ENABLE_LAN_RUNG,
+                        default=options.get(
+                            CONF_ENABLE_LAN_RUNG, DEFAULT_ENABLE_LAN_RUNG
+                        ),
                     ): bool,
                     vol.Optional(
                         CONF_DOOR_PASSWORD,

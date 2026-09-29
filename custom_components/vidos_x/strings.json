@@ -59,12 +59,14 @@
           "scan_interval": "Poll interval (seconds)",
           "verify_ssl": "Verify TLS certificate",
           "enable_alarm_switch": "Enable alarm arm/disarm switch (experimental)",
+          "enable_lan_rung": "Detect rings via LAN broadcast (fast, needs phone on Wi-Fi)",
           "door_password": "Door opening password",
           "rtsp_url": "RTSP stream URL"
         },
         "data_description": {
           "rtsp_url": "e.g. rtsp://192.168.1.50:554/stream1 - enables the camera entity.",
-          "door_password": "Unlock password for set.device.opendoor. Leave empty to use the device password (sent SHA-256 hashed)."
+          "door_password": "Unlock password for set.device.opendoor. Leave empty to use the device password (sent SHA-256 hashed).",
+          "enable_lan_rung": "Listens for the Vidos app/door-station ASZENO discovery burst on UDP 5000/5001; fires the doorbell event within seconds of a ring. Turning it off falls back to status polling only."
         }
       }
     }

@@ -59,6 +59,7 @@
           "scan_interval": "Interwał odpytywania (sekundy)",
           "verify_ssl": "Weryfikuj certyfikat TLS",
           "enable_alarm_switch": "Włącz przełącznik uzbrojenia alarmu (eksperymentalny)",
+          "enable_lan_rung": "Wykrywanie dzwonka przez broadcast LAN",
           "door_password": "Hasło otwierania drzwi",
           "rtsp_url": "Adres strumienia RTSP"
         },

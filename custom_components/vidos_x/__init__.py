@@ -25,14 +25,17 @@ from .const import (
     CONF_DEVICE_PASSWORD,
     CONF_DEVICE_USERNAME,
     CONF_ENABLE_ALARM_SWITCH,
+    CONF_ENABLE_LAN_RUNG,
     CONF_RTSP_URL,
     CONF_SCHEME,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
+    DEFAULT_ENABLE_LAN_RUNG,
     DOMAIN,
     SERVICE_OPEN_DOOR,
 )
 from .coordinator import VidosXCoordinator
+from .lan import AzenoLanListener
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +64,7 @@ class VidosRuntimeData:
     client: VidosCgiClient
     coordinator: VidosXCoordinator
     platforms: list[Platform] = field(default_factory=list)
+    lan_listener: AzenoLanListener | None = None
 
 
 type VidosConfigEntry = ConfigEntry[VidosRuntimeData]
@@ -127,9 +131,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> boo
     coordinator = VidosXCoordinator(hass, entry=entry, client=client)
     await coordinator.async_config_entry_first_refresh()
 
+    lan_listener: AzenoLanListener | None = None
+    if entry.options.get(CONF_ENABLE_LAN_RUNG, DEFAULT_ENABLE_LAN_RUNG):
+        lan_listener = AzenoLanListener(
+            lambda _ip, kind: coordinator.note_rung(f"lan-{kind}")
+        )
+        if not await lan_listener.async_start():
+            lan_listener = None
+
     platforms = _platforms_for_entry(entry)
     entry.runtime_data = VidosRuntimeData(
-        client=client, coordinator=coordinator, platforms=platforms
+        client=client,
+        coordinator=coordinator,
+        platforms=platforms,
+        lan_listener=lan_listener,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
@@ -139,6 +154,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> boo
 
 async def async_unload_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> bool:
     """Unload a config entry."""
+    if entry.runtime_data:
+        if entry.runtime_data.lan_listener:
+            entry.runtime_data.lan_listener.async_stop()
+        entry.runtime_data.coordinator.cancel_rung_pulse()
     platforms = entry.runtime_data.platforms if entry.runtime_data else list(PLATFORMS)
     return await hass.config_entries.async_unload_platforms(entry, platforms)
 

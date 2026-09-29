@@ -11,6 +11,7 @@ CONF_CGI_PORT = "cgi_port"
 CONF_SCHEME = "scheme"
 CONF_VERIFY_SSL = "verify_ssl"
 CONF_ENABLE_ALARM_SWITCH = "enable_alarm_switch"
+CONF_ENABLE_LAN_RUNG = "enable_lan_rung"
 CONF_RTSP_URL = "rtsp_url"
 CONF_DOOR_PASSWORD = "door_password"
 CONF_MODEL = "model"
@@ -23,6 +24,10 @@ DEFAULT_CGI_PORT = 443
 DEFAULT_SCAN_INTERVAL = 10
 MIN_SCAN_INTERVAL = 5
 MAX_SCAN_INTERVAL = 3600
+DEFAULT_ENABLE_LAN_RUNG = True
+
+# How long the doorbell binary sensor stays ON after a ring event.
+DOORBELL_ON_SECONDS = 15
 
 SERVICE_OPEN_DOOR = "open_door"
 ATTR_DEVICE_ID = "device_id"

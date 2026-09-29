@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -10,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOORBELL_ON_SECONDS
 from .entity import VidosEntity
 
 
@@ -39,7 +42,7 @@ class VidosOnlineBinarySensor(VidosEntity, BinarySensorEntity):
 
 
 class VidosDoorbellBinarySensor(VidosEntity, BinarySensorEntity):
-    """Doorbell / ring event (device field ``devicestatus.calling``)."""
+    """Doorbell ON while ringing (CGI flag) or within the LAN-ring pulse."""
 
     _attr_name = "Doorbell"
     # No device class: HA has no DOORBELL class, and OCCURRENCE was removed in
@@ -50,7 +53,13 @@ class VidosDoorbellBinarySensor(VidosEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         data = self.coordinator.data
-        return bool(data and data.ringing)
+        if data and data.ringing:
+            return True
+        last_rung = self.coordinator.last_rung
+        return bool(
+            last_rung
+            and (datetime.now() - last_rung).total_seconds() < DOORBELL_ON_SECONDS
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:

@@ -15,7 +15,7 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 | Open door (`set.device.opendoor`) | `button.open_door` + `vidos_x.open_door` service | **verified on hardware** (sha256 unlock password) |
 | Device online status | `binary_sensor.status` | **verified on hardware** (local poll) |
 | Lock state | `sensor.lock_state` | verified field (`devicestatus.lockstatus`), model-dependent |
-| Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | field identified (`devicestatus.calling`), not yet live-tested |
+| Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | **LAN broadcast verified on hardware** (Azeno scan/reply, ~6 s after ring); status-flag path kept as fallback |
 | Alarm arm/disarm | `switch.alarm_disarmed` (opt-in) | experimental |
 | Live video | `camera` via RTSP URL (opt-in) | requires RTSP/ONVIF on the device (unverified) |
 | Device discovery | cloud login (opt-in) | unverified (`vidos.qvcloud.net`) |
@@ -41,17 +41,22 @@ directory and restart.
 * **Cloud account** – Vidos X app credentials used only to *discover* devices
   (IP / port / dynamic password). Unverified.
 
-Options (per device): poll interval, TLS verification, door password,
-RTSP stream URL (enables the camera entity), experimental alarm switch.
+Options (per device): poll interval, TLS verification, LAN ring detection
+(on by default), door password, RTSP stream URL (enables the camera entity),
+experimental alarm switch.
 
 Service `vidos_x.open_door` targets one or more devices by `device_id`.
 
 ## Doorbell notifications
 
-The integration polls `get.device.status` every **10 s** by default (option
-*Poll interval*, min 5 s). When `devicestatus.calling` flips to `true` the
-binary sensor turns on **and** a `vidos_x.doorbell_rung` event fires — use that
-event for notifications:
+**How a ring is detected (verified 2026-10-02):** `get.device.status` does
+*not* change when the bell is pressed — polling alone cannot see a ring. The
+integration therefore listens on the LAN for the Azeno discovery chain: the
+Vidos app on a phone (woken by the push notification, app closed) broadcasts
+`ASZENO.SEARCH.V4.1` to UDP 5000, and the door station answers on UDP 5001 —
+observed ~6 s after every ring, silence otherwise. That burst fires the
+`vidos_x.doorbell_rung` event, pulses the binary sensor for 15 s and triggers
+the `event.*_doorbell` entity:
 
 ```yaml
 automation:
@@ -71,8 +76,16 @@ automation:
 
 Notes:
 
-* For minimal latency set the poll interval option to **5 s** (a ring must be
-  long enough to be caught by a poll; typical intercom calls are 20 s+).
+* Requires a phone with the Vidos X app **on the same LAN** (the burst comes
+  from the phone; HA and the phone just need to share a broadcast domain).
+  Turn off *LAN ring detection* in the options if you don't want UDP 5000/5001
+  bound; polling fallback (`devicestatus.calling`) stays active either way.
+* HA must receive **broadcasts**: bare-metal/VM on the LAN is fine; Docker
+  bridge networks usually are not (use `network_mode: host`).
+* Known caveat: opening the Vidos app manually runs the same discovery scan
+  and can produce a false ring event.
+* Event payload: `device`, `entry_id`, `when`, `source`
+  (`lan-scan` / `lan-reply` / `cgi`).
 * `event.*_doorbell` (device class `doorbell`, event type `ring`) is the
   stateless alternative — its state changes to a timestamp on every press:
 
@@ -81,8 +94,9 @@ Notes:
     - platform: state
       entity_id: event.your_intercom_doorbell
   ```
-* `binary_sensor.*_doorbell` (plain state, `mdi:doorbell` icon) works too if you prefer
-  state-based triggers; attribute `last_rung` holds the last ring timestamp.
+* `binary_sensor.*_doorbell` (plain state, `mdi:doorbell` icon) is ON for 15 s
+  after each ring; attribute `last_rung` holds the last ring timestamp.
+* Debug the LAN chain standalone with `python tools/lanwatch.py`.
 
 ## Development
 

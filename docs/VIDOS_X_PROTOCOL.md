@@ -206,6 +206,34 @@ and a JSON envelope (`QvCommonJsonRequest` + `QvJsonHeader`):
 * Error codes parse the same (`"error": -10`); see `probe.extract_error` / `flatten_json`.
 * Probe support: `tools/probe.py --watch` sends `jlock`/`jaudio`/`jbabysitter` over JSON.
 
+### 3.3 Azeno LAN discovery / ring signal (hardware-confirmed 2026-10-02)
+
+UDP broadcast protocol spoken by the station and the vendor's apps (name from
+the packet magic; NOT present in the app's Java code — implemented in the
+device firmware and the native `libqv-p2p-v2.so`):
+
+| Direction | Packet | Notes |
+|---|---|---|
+| Phone app → broadcast `:5000` | `ASZENO.SEARCH.V4.1` (18 B, src port 5003) | discovery probe, 4 packets @1 Hz |
+| Station → broadcast `:5001` | `ASZENO.SEARCH.V4` + 616 B total | reply 15–85 ms after each probe |
+
+Station reply layout: `ASZENO.SEARCH.V4` magic (16 B) + header
+(`01000000 00000000 20000000 10020000 …` — 40 B) + **392-byte fixed blob**
+(device identity, high entropy) + **224-byte varying tail** (differs per
+packet; first divergence at byte 392).
+
+**Ring chain (verified live):** bell press → device → cloud → FCM push →
+phone app wakes (closed, ~6 s latency) → `ASZENO.SEARCH.V4.1` burst →
+station replies. `get.device.status`/`get.record.alarmrecord` showed **no**
+change during a ring (12-command watch, XML+JSON dialects), so this
+broadcast burst is the only LAN-observable ring signal. Sources: Wireshark
+capture (`capture.pcapng`), `tools/lanwatch.py`, integration `lan.py`.
+
+Caveats: needs a phone with the vendor app on the same LAN; opening the app
+manually runs the same scan (possible false positive). The station's normal
+cloud traffic is unicast and invisible to a plain LAN capture (switched
+network).
+
 ---
 
 ## 4. Live video / snapshot
