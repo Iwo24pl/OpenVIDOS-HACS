@@ -12,6 +12,7 @@ CONF_SCHEME = "scheme"
 CONF_VERIFY_SSL = "verify_ssl"
 CONF_ENABLE_ALARM_SWITCH = "enable_alarm_switch"
 CONF_ENABLE_LAN_RUNG = "enable_lan_rung"
+CONF_ENABLE_CAMERA = "enable_camera"
 CONF_CAMERAS = "cameras"
 CONF_CAMERAS_ORIGINAL = "cameras_original"
 CONF_DOOR_PASSWORD = "door_password"
@@ -28,6 +29,13 @@ DEFAULT_SCAN_INTERVAL = 3
 MIN_SCAN_INTERVAL = 3
 MAX_SCAN_INTERVAL = 3600
 DEFAULT_ENABLE_LAN_RUNG = True
+DEFAULT_ENABLE_CAMERA = True
+
+# Snapshot camera (QUII media port, docs/VIDOS_X_PROTOCOL.md §4)
+SNAPSHOT_TTL_SECONDS = 5  # reuse a freshly grabbed JPEG for this long
+SNAPSHOT_TIMEOUT_SECONDS = 10  # whole session: connect + first keyframe
+SNAPSHOT_COOLDOWN_SECONDS = 15  # back off after a failed snapshot
+STREAM_KEY_CACHE_SECONDS = 3600  # re-fetch get.device.streamkey rarely
 
 # Physically verified output for IDS9483AW: door=1 (CAM1), lock=1 (DOOR1).
 DEFAULT_DOOR = 1

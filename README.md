@@ -3,11 +3,12 @@
 Home Assistant custom integration for **Vidos X** intercoms / door stations
 (Vidos sp. z o.o., white-labeled Qualvision/Quvii "TDK cloud" platform).
 
-> **Status: Phase 0 verified (V1.0).** The status poll and door-open commands were
-> validated on real hardware (IDS9483AW): header `adminapp2` + `sha256(password)` +
-> `passwordencode=1`, unlock content `door`+`locknumber`+`password=sha256(...)`.
-> **Video: the device exposes no RTSP/ONVIF** — only the proprietary `quii://`
-> media port 34567 (see *Video* below). Cloud discovery lives in `cloud.py`
+> **Status: Phase 0 verified (V1.0) + live video snapshots (v0.3.0).** The status
+> poll and door-open commands were validated on real hardware (IDS9483AW):
+> header `adminapp2` + `sha256(password)` + `passwordencode=1`, unlock content
+> `door`+`locknumber`+`password=sha256(...)`. **Video:** no RTSP/ONVIF — but the
+> proprietary `quii://` media port 34567 is reverse-engineered and ported
+> (snapshot camera, see *Video* below). Cloud discovery lives in `cloud.py`
 > (backend kept, removed from the setup UI).
 
 ## Features
@@ -19,7 +20,7 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 | Lock state | `sensor.lock_state` | verified field (`devicestatus.lockstatus`), model-dependent |
 | Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | **LAN broadcast verified on hardware** (Azeno scan/reply, ~6 s after ring); status-flag path kept as fallback |
 | Alarm arm/disarm | `switch.alarm_disarmed` (opt-in) | experimental |
-| Live video | *none* (device speaks proprietary `quii://` only) | see *Video* below |
+| Live video | `camera.*` snapshot (built-in `quii://` port) | **verified on hardware** (no RTSP/ONVIF; on-demand snapshot via port 34567) |
 | Associated cameras | camera entities from other integrations attached to the device page | options: pick entities (multiple) |
 | Device discovery | cloud login | **removed from the UI** (`cloud.py` kept for later) |
 
@@ -45,9 +46,10 @@ directory and restart.
   (the backend in `cloud.py` is kept for later).
 
 Options (per device): poll interval, TLS verification, LAN ring detection
-(on by default), door password, open-button output (`default_door` /
-`default_lock`, default `1`/`1` = the verified DOOR1 output), associated
-camera entities (multiple, from other integrations), experimental alarm switch.
+(on by default), snapshot camera (on by default), door password, open-button
+output (`default_door` / `default_lock`, default `1`/`1` = the verified DOOR1
+output), associated camera entities (multiple, from other integrations),
+experimental alarm switch.
 
 Service `vidos_x.open_door` targets one or more devices by `device_id`. The
 `door`/`lock` fields map to the device's lock table (`get.device.attachInfo`);
@@ -120,17 +122,27 @@ Notes:
 2026-10-02): port scan shows only `443` (CGI), `34567` (proprietary media) and
 `8765` (unknown binary protocol); `554`, ONVIF ports and HTTP are closed;
 `get.network.base`/`get.network.config`/`get.onvif.pwd` all answer `error=-10`
-(firmware does not implement them). The official app streams over
-`quii://adminapp2:<sha256(auth)>@<ip>:34567/mode=real&idc=..&ids=..` via its
-native `live_player` library — not consumable by Home Assistant.
+(firmware does not implement them).
 
-Practical options for showing the door view in HA:
+**But port 34567 speaks a fully reverse-engineered protocol** (the official
+app's `quii://` URL), and the integration ports it: the `camera` entity grabs
+a **still snapshot on demand** — it opens a short media session, pulls the
+first H.264 keyframe (~2.2 s) and decodes it to JPEG locally:
 
-1. Use a camera from another integration (IP cam / NVR pointed at the door) and
-   **associate it** in the options — it appears on the intercom's device page
-   (association only, no restream).
-2. Reverse-engineer `quii://` (long-term; open ports 34567/8765 suggest direct
-   LAN streaming is possible in principle).
+* Needs the **ffmpeg binary** (installed with Home Assistant / add-on; the
+  manifest declares the `ffmpeg` integration as a dependency).
+* Snapshots are cached for 5 s and the entity backs off 15 s after failures —
+  there is **no continuous streaming** and essentially no background traffic.
+* Turn it off in the options (*Snapshot camera*); the camera then isn't loaded
+  at all.
+* Per-channel caveat: `idc=1` is CAM1 (door view, 352×280); CAM2 streams the
+  blank default while its lens is disconnected.
+
+Still useful: cameras from other integrations (IP cam / NVR pointed at the
+door) can be **associated** in the options — they appear on the intercom's
+device page (association only, no restream).
+
+Wire-level details: [`docs/VIDOS_X_PROTOCOL.md`](docs/VIDOS_X_PROTOCOL.md) §4.
 
 ## Development
 
@@ -153,7 +165,10 @@ implementation plan in [`docs/HACS_INTEGRATION_PLAN.md`](docs/HACS_INTEGRATION_P
 3. ✅ Video probe: no RTSP/ONVIF on this firmware — `554`/ONVIF ports closed,
    `get.network.base`, `get.network.config`, `get.onvif.pwd` → `error=-10`;
    media only via proprietary port 34567 (`quii://`, native `live_player`).
-4. Cloud discovery UI removed; `cloud.py` backend kept for a later release.
+4. ✅ `quii://` port 34567 reverse-engineered and ported (v0.3.0): handshake,
+   AES-256-CBC framing and keyframe extraction verified on hardware; snapshot
+   camera produces JPEG via local ffmpeg (see §4 of the protocol doc).
+5. Cloud discovery UI removed; `cloud.py` backend kept for a later release.
 
 ## Security notes
 

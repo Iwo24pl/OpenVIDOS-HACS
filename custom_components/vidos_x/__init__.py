@@ -32,11 +32,13 @@ from .const import (
     CONF_DEVICE_UID,
     CONF_DEVICE_USERNAME,
     CONF_ENABLE_ALARM_SWITCH,
+    CONF_ENABLE_CAMERA,
     CONF_ENABLE_LAN_RUNG,
     CONF_SCHEME,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
     DEFAULT_DOOR,
+    DEFAULT_ENABLE_CAMERA,
     DEFAULT_ENABLE_LAN_RUNG,
     DEFAULT_LOCK,
     DOMAIN,
@@ -125,6 +127,8 @@ def _platforms_for_entry(entry: ConfigEntry) -> list[Platform]:
     platforms = list(PLATFORMS)
     if not entry.options.get(CONF_ENABLE_ALARM_SWITCH, False):
         platforms.remove(Platform.SWITCH)
+    if entry.options.get(CONF_ENABLE_CAMERA, DEFAULT_ENABLE_CAMERA):
+        platforms.append(Platform.CAMERA)
     return platforms
 
 

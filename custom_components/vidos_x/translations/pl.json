@@ -35,6 +35,7 @@
           "verify_ssl": "Weryfikuj certyfikat TLS",
           "enable_alarm_switch": "Włącz przełącznik uzbrojenia alarmu (eksperymentalny)",
           "enable_lan_rung": "Wykrywanie dzwonka przez broadcast LAN",
+          "enable_camera": "Kamera zrzutów (wbudowane wideo QUII)",
           "door_password": "Hasło otwierania drzwi",
           "default_door": "Przycisk otwierania - drzwi (kanał)",
           "default_lock": "Przycisk otwierania - identyfikator zamka",
@@ -44,7 +45,8 @@
           "door_password": "Hasło odblokowania do set.device.opendoor. Puste = użyj hasła urządzenia (wysyłane jako SHA-256).",
           "default_door": "Kanał używany przez przycisk Otwórz drzwi i domyślnie w usłudze. 1 = CAM1/DOOR1 (zweryfikowano), 2 = CAM2/DOOR2, 0 = wyjścia samodzielne (brama).",
           "default_lock": "Identyfikator zamka używany przez przycisk Otwórz drzwi i domyślnie w usłudze. 1 = drzwi (zweryfikowano), 2 = brama automatyczna, 0 = domyślny.",
-          "cameras": "Encje kamer z innych integracji powiązane z tym domofonem: pojawiają się na stronie urządzenia (bez restreamu)."
+          "cameras": "Encje kamer z innych integracji powiązane z tym domofonem: pojawiają się na stronie urządzenia (bez restreamu).",
+          "enable_camera": "Dodaje encję kamery, która na żądanie pobiera klatkę z serialowego portu wideo QUII domofonu (bez ciągłego streamowania). Wymaga binarki ffmpeg z HA."
         }
       }
     }

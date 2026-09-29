@@ -18,6 +18,7 @@ Tested against an **IDS9483AW** door station (fw `V100.R001.A311.00.G0108.B018`)
 | `set.device.opendoor` | `<error>0</error>` + **physical relay actuation confirmed** with content `door=1`, `locknumber=1`, `password=sha256hex(first-contact password)` (`DeviceUnlockContent` shape) ✅ 2026-10-02. Note: the device returns `error=0` even for pairs with no configured output (e.g. `door=0, lock=0`) — `error=0` alone does not prove actuation. |
 | Error codes | `-10028` incorrect password, `-10029` busy (from `SDKStatus.java`) |
 | RTSP/ONVIF, cloud discovery | RTSP/ONVIF **probed absent** (§4, 2026-10-02); cloud discovery UI removed (`cloud.py` kept) |
+| Live video | **`quii://` media protocol on TCP 34567 verified end-to-end** (handshake → AES-256 → H.264 352×280@25fps decoded frame) ✅ 2026-10-02, see §4 |
 
 ---
 
@@ -254,13 +255,15 @@ network).
 
 ---
 
-## 4. Live video / snapshot (hardware-probed 2026-10-02)
+## 4. Live video — `quii://` media protocol (hardware-verified 2026-10-02)
 
-**Result: no standard video protocol is available on this firmware.**
+**Result: live video works fully over the LAN.** The proprietary media
+protocol on TCP **34567** was reverse-engineered and verified end-to-end on
+the IDS9483AW: handshake → decrypt → H.264 keyframe → decoded picture.
 
-Port scan (TCP, full range) of the IDS9483AW: **`443` (CGI), `34567`
-(proprietary media), `8765` (unknown binary protocol)** — `554`, `8000`,
-`8899` and HTTP are closed/refusing.
+**No standard video protocol exists on this firmware** (still true): port scan
+(TCP, full range) shows only **`443` (CGI), `34567` (media), `8765` (unknown
+binary)** — `554`, `8000`, `8899` and HTTP are closed/refusing.
 
 * `get.network.base` / `get.network.config` (both dialects) → `error=-10`
   (firmware does not implement them — no `rtspport`/`rtspurl` to read).
@@ -268,26 +271,95 @@ Port scan (TCP, full range) of the IDS9483AW: **`443` (CGI), `34567`
   but **empty content** (no `<rtsp><preview>` / `ability_rtsp`).
 * Raw probes: RTSP `OPTIONS`, HTTP, ONVIF `GetCapabilities` against 8765/34567
   → not those protocols. Port **8765 answered with an unknown binary frame**
-  (`0a 00 01 00 00 00 ee 26 …`); port **34567** accepts TCP and waits
-  (media port).
-* The app's live view uses the native `live_player` over
-  `quii://<user>[:<sha256pass>]@<ip>:<streamPort>/mode=real&idc=<ch>&ids=<stream>[&tls=1]`
-  (`QvPlayerCore:3127-3147`, default `DEVICE_DEFAULT_STEAM_PORT = 34567`,
-  user `adminapp2`, TLS media port from LAN discovery). Session decryption key
-  comes from `get.device.streamkey` (XML — works: returns `key`/`tdc`, same
-  values as `get.device.status`).
+  (`0a 00 01 00 00 00 ee 26 …`); port **34567** is the media port below.
+* Prior (static-only) expectations for ONVIF/RTSP (`get.onvif.pwd` command,
+  `onvifSupport` fields in `get.encode`) are **not realized by this firmware**.
 * App snapshots are decoded client-side (`QvPlayerCore.snapShot()` JNI) — no
   HTTP snapshot/JPEG endpoint exists anywhere in the Java layer.
 
-**Implication for HA:** no RTSP/ONVIF/snapshot URL can be configured — the
-RTSP URL option was removed; cameras from other integrations are *associated*
-with the device instead (options → "Associated cameras"). Viable future routes:
-reverse-engineer `quii://` (ports 34567/8765 suggest direct LAN streaming),
-or an add-on wrapping the ARM `live_player` lib.
+### 4.1 Prior art (open source — read this first)
 
-Prior (static-only) expectations for ONVIF/RTSP (`get.onvif.pwd` command,
-`onvifSupport` fields in `get.encode`) are **not realized by this firmware** —
-the app has no UI caller for them either.
+The media protocol is already documented/implemented by the community
+(license-compatible, credited in README):
+
+| Project | What it covers |
+|---|---|
+| [`fariborz0015/quii-lan-client`](https://github.com/fariborz0015/quii-lan-client) (MIT) | Full QUII media client: Setup/Play/keepalive, AES crypto, H.264 + G.711 listen/talk — offline RE of `liblive_player.so` (`CQUIIStreamBase`, `EncryptData`, `SetIvec`) |
+| [`fdaneluzzi/homeassistant-allo-wt7`](https://github.com/fdaneluzzi/homeassistant-allo-wt7) | Door control + ring polling (`get.record.session`) on sibling `IDS9478AW` |
+| [`totoantibes/golmar-quvii-ha`](https://github.com/totoantibes/golmar-quvii-ha) | HACS door-open for Golmar/Quvii panels (cloud+local key), brand App ID/OEM ID table |
+| [`jdntortosa/fermax-wayfi-ha`](https://github.com/jdntortosa/fermax-wayfi-ha) | UMEye/Quvii-family LAN door protocol (different port 5801, UMSP) |
+
+Our findings below independently confirm the wire format on the IDS9483AW.
+
+### 4.2 Credentials
+
+1. **Stream key**: CGI `get.device.streamkey` (XML, works) → `<key>` (32 ASCII
+   chars, AES key material) and `<tdc>` (large blob, unused so far).
+2. **Wire auth**: user `adminapp2`, password = `sha256hex(auth code)` — the
+   same value the CGI `lan-hash` header uses (device password works as the QR
+   auth code `c` field equivalent).
+3. App URL shape (`QvPlayerCore:3127-3147`):
+   `quii://<user>[:<sha256pass>]@<ip>:<streamPort>/mode=real&idc=<ch>&ids=<stream>[&tls=1]`,
+   `DEVICE_DEFAULT_STEAM_PORT = 34567`.
+
+### 4.3 Wire flow (verified)
+
+```
+TCP connect <ip>:34567
+C→S  Setup     0xA9 + 31×0x00                      (32 B, plaintext)
+S→C  Setup-RX  hdr[9]=0, enc_mode=hdr[0x0A]=2 (AES-256), sha_mode=hdr[0x0B]=1 (SHA-256)
+C→S  Play      opcode 0x01, body "user&&pass\0"[+ids]
+               fields: param_len@+9, body_len@+0x0B, idc@+0x0D(u16),
+               play_arg@+0x0F, ids@+0x10, inner@+0x11
+               SHA-256(hdr||body) appended; AES-CBC (IV='0'×16) applied as three
+               independent chunks: hdr32 | body[:padded prefix] | body tail clear
+S→C  0x01 Play-ACK, 0xFE info messages (contain the channel tag, e.g. "CAM1"),
+    then media 0xA0..0xA3
+C→S  KeepAlive 0x00 (encrypted, empty body) — device echoes 0x00 back
+```
+
+Media message: encrypted 32-B header (`body_len` = u32@+0x0B), body = first
+`param_len`(u16@+9) bytes AES + remainder plaintext. Decrypted payload starts
+with a **20-byte QV frame header**: `00 00 01 | E0+type | u32le payload_len |
+… | codec@0x0E | payload@0x14`, payload = annex-B H.264 (or G.711 A-law when
+type=3).
+
+Frame types (`hdr[3] - 0xE0`): `0` = P-frame, `1` = IDR keyframe, `3` = audio.
+
+### 4.4 Measured behavior (IDS9483AW, 2026-10-02)
+
+| Property | Value |
+|---|---|
+| CAM1 (`idc=1`, `ids=1`) | H.264 **352×280 @ 25 fps**, ~60 KB/s (night scene), IDR every ~2.1 s |
+| CAM2 (`idc=2`, `ids=1`) | **640×280 @ 25 fps** stream exists but shows the blank/white default — lens disconnected (confirmed by owner) |
+| `ids=2` | no media (only `0xFE` info) |
+| Time to first frame | ~2.0–2.5 s after connect |
+| Keepalive | echo confirmed (`0x00` ×5 in a 30 s session) |
+| Reconnect | new session OK after **0.5 s** gap; one failure observed after an abrupt mid-burst close → use connect backoff |
+| Session stability | ≥30 s verified repeatedly; 5-min endurance run (4572 media msgs, 46 keyframes, 29 keepalives echoed): see §7 |
+| Snapshot path (HA) | live test: streamkey 0.07 s → keyframe 2.15 s → 5916 B H.264 → 16 KB JPEG |
+
+Audio (`type=3`, G.711 A-law 8 kHz) is interleaved in the same media stream.
+
+### 4.5 Implication for HA (implemented, v0.3.0)
+
+Snapshots require a **local H.264→JPEG decode step (ffmpeg)** — the device
+never serves JPEG. The integration therefore ships:
+
+* **`quii.py`** — async client for the flow in §4.3 (Setup → Play → media
+  parser → keyframe extraction). Framing/crypto adapted from the MIT-licensed
+  [`quii-lan-client`](https://github.com/fariborz0015/quii-lan-client).
+* **`camera.py`** — snapshot-only camera entity (no continuous streaming):
+  on each image request it fetches a short-lived `get.device.streamkey`, opens
+  a brief media session, grabs the first standalone keyframe (SPS+IDR, ~2.2 s
+  after connect), decodes it to JPEG with Home Assistant's `ffmpeg`
+  integration (`dependencies: ["ffmpeg"]` in the manifest) and caches the
+  result (5 s TTL, 15 s failure cooldown). Disabled via the
+  *Snapshot camera* option (`enable_camera`, on by default).
+
+External camera entities can still be *associated* with the device
+(options → "Associated cameras"). Port **8765** remains an unknown binary
+protocol (not needed for video).
 
 ---
 
@@ -306,8 +378,8 @@ the app has no UI caller for them either.
         │  Door station / camera                                          │
         │  http(s)://<ip>:<cgiPort>/tdkcgi   ← XML/JSON CGI, door open,       │
         │       status, config (this is what the app uses)                   │
-        │  :34567 quii:// media + :8765 binary  ← video (proprietary, no     │
-        │       RTSP/ONVIF — probed 2026-10-02)                              │
+         │  :34567 quii:// media + :8765 binary  ← video: quii:// RE'd & verified    │
+         │       (§4); no RTSP/ONVIF; 8765 still unknown                            │
         │  P2P (native lib)             ← app's cloud fallback, not for HA   │
         └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -318,8 +390,9 @@ Practical consequences:
    Retrofit client on `ip:cgiPort`.
 2. Cloud access is needed to: discover devices (ip/cgiPort/dynamic password), learn online
    status, and read alarm/ring records — **UI removed for now, `cloud.py` kept**.
-3. Video: **no RTSP/ONVIF** (probed) — only the proprietary `quii://` media port; associate
-   external camera entities instead (integration options).
+3. Video: **no RTSP/ONVIF** (probed) — live video works over the proprietary
+   `quii://` media port 34567 (§4, verified), which the integration now uses for
+   its camera entity; external camera entities can still be associated.
 
 ---
 
@@ -339,8 +412,9 @@ Practical consequences:
 1. Capture one app session (`mitmproxy` with the bundled CA, or device-side tcpdump) to confirm:
    the exact envelope XML, password hashing (`usernametoken`), and whether `IS_OPEN_AUTH` is on.
 2. ~~Confirm ONVIF/RTSP ports~~ **done 2026-10-02: none exist** (see §4);
-   remaining: identify the binary protocol on port 8765 and the exact
-   `quii://` handshake on 34567.
+   ~~identify the `quii://` handshake on 34567~~ **done 2026-10-02: verified
+   end-to-end** (§4.3); remaining: identify the binary protocol on port 8765,
+   and explain the rare no-media-on-reconnect case (use backoff meanwhile).
 3. Confirm which cloud region host `vidos.qvcloud.net` resolves to for EU users and whether
    service type 0/1 addresses are subdomains of it.
 4. Confirm ring/alarm delivery: FCM only, or also a server-pushed down-channel event?

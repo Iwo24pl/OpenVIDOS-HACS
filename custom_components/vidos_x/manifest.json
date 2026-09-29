@@ -5,10 +5,15 @@
     "Iwo24pl"
   ],
   "config_flow": true,
+  "dependencies": [
+    "ffmpeg"
+  ],
   "documentation": "https://github.com/Iwo24pl/OpenVIDOS-HACS",
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Iwo24pl/OpenVIDOS-HACS/issues",
-  "requirements": [],
-  "version": "0.2.0"
+  "requirements": [
+    "cryptography>=42.0"
+  ],
+  "version": "0.3.0"
 }
