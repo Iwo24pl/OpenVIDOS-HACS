@@ -2,7 +2,7 @@
   "domain": "vidos_x",
   "name": "Vidos X",
   "codeowners": [
-    "Iwo24pl"
+    "@Iwo24pl"
   ],
   "config_flow": true,
   "dependencies": [
@@ -12,8 +12,6 @@
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Iwo24pl/OpenVIDOS-HACS/issues",
-  "requirements": [
-    "cryptography>=42.0"
-  ],
+  "requirements": [],
   "version": "1.0.0"
 }
