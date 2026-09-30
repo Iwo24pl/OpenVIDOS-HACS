@@ -1,4 +1,4 @@
-﻿"""LAN ring detection for Vidos X (Azeno discovery broadcasts).
+"""LAN ring detection for Vidos X (Azeno discovery broadcasts).
 
 Parity note (APP_PARITY §8, decision D2): the app-side ASZENO strings live in
 native code (`liblive_player.so`, not present in the dex extraction); this

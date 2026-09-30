@@ -1,4 +1,4 @@
-﻿"""Unit tests for the QUII media client (pure, no Home Assistant needed).
+"""Unit tests for the QUII media client (pure, no Home Assistant needed).
 
 ``tests/fixtures/quii_stream.bin`` is a real IDS9483AW capture re-encrypted
 with a dummy key (the device streamkey never enters the repository).

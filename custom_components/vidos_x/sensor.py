@@ -1,4 +1,4 @@
-﻿"""Sensors for Vidos X."""
+"""Sensors for Vidos X."""
 
 from __future__ import annotations
 

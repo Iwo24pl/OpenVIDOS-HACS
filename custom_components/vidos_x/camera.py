@@ -1,4 +1,4 @@
-﻿"""Snapshot camera for Vidos X - one keyframe per image via the QUII protocol.
+"""Snapshot camera for Vidos X - one keyframe per image via the QUII protocol.
 
 On demand: fetch streamkey (CGI) -> short TCP 34567 session -> first H.264
 keyframe -> local ffmpeg -> JPEG. No continuous traffic; see

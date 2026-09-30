@@ -1,4 +1,4 @@
-﻿"""The Vidos X integration."""
+"""The Vidos X integration."""
 
 from __future__ import annotations
 

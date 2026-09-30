@@ -1,4 +1,4 @@
-﻿"""Diagnostics support for Vidos X."""
+"""Diagnostics support for Vidos X."""
 
 from __future__ import annotations
 

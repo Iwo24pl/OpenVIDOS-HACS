@@ -1,4 +1,4 @@
-﻿"""Button platform for Vidos X (momentary door open)."""
+"""Button platform for Vidos X (momentary door open)."""
 
 from __future__ import annotations
 

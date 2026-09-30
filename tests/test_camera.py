@@ -1,4 +1,4 @@
-﻿"""Camera platform tests.
+"""Camera platform tests.
 
 Constants load without Home Assistant; platform gating follows the same
 graceful-degradation pattern as ``test_config_flow.py``.

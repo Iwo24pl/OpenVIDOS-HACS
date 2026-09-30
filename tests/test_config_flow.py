@@ -1,4 +1,4 @@
-﻿"""Config flow tests (require the Home Assistant test environment).
+"""Config flow tests (require the Home Assistant test environment).
 
 Local runs without Home Assistant simply skip this module - see
 ``requirements_test.txt`` for the optional harness:

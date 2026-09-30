@@ -1,4 +1,4 @@
-﻿"""QUII media protocol client (TCP 34567) - snapshot source for the camera.
+"""QUII media protocol client (TCP 34567) - snapshot source for the camera.
 
 Parity note (APP_PARITY §7/§9 D3): the app plays video via the native
 `liblive_player.so` behind `QvPlayerCore` (exoplayer facade); this module is

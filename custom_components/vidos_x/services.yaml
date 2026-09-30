@@ -1,4 +1,4 @@
-﻿open_door:
+open_door:
   fields:
     device_id:
       required: true

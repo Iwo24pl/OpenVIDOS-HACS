@@ -1,4 +1,4 @@
-﻿"""Unit tests for models.py (pure dataclasses, no HA needed)."""
+"""Unit tests for models.py (pure dataclasses, no HA needed)."""
 
 from __future__ import annotations
 

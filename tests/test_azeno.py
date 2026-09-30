@@ -1,4 +1,4 @@
-﻿"""Unit tests for the LAN ring detector (no sockets, no Home Assistant)."""
+"""Unit tests for the LAN ring detector (no sockets, no Home Assistant)."""
 
 from __future__ import annotations
 

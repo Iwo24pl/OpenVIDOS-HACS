@@ -1,4 +1,4 @@
-﻿"""Config flow for Vidos X (manual LAN setup)."""
+"""Config flow for Vidos X (manual LAN setup)."""
 
 from __future__ import annotations
 

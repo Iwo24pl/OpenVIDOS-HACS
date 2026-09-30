@@ -1,4 +1,4 @@
-﻿"""Constants for the Vidos X integration."""
+"""Constants for the Vidos X integration."""
 
 DOMAIN = "vidos_x"
 

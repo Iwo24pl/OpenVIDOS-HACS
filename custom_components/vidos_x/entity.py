@@ -1,4 +1,4 @@
-﻿"""Base entity for Vidos X."""
+"""Base entity for Vidos X."""
 
 from __future__ import annotations
 

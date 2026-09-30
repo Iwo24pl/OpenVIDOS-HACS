@@ -1,4 +1,4 @@
-﻿"""Switch platform for Vidos X (alarm arm/disarm - experimental)."""
+"""Switch platform for Vidos X (alarm arm/disarm - experimental)."""
 
 from __future__ import annotations
 

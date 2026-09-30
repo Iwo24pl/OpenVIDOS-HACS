@@ -1,4 +1,4 @@
-﻿"""Event platform for Vidos X (stateless doorbell presses)."""
+"""Event platform for Vidos X (stateless doorbell presses)."""
 
 from __future__ import annotations
 

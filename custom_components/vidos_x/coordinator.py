@@ -1,4 +1,4 @@
-﻿"""Coordinator for Vidos X device polling."""
+"""Coordinator for Vidos X device polling."""
 
 from __future__ import annotations
 
