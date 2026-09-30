@@ -361,6 +361,94 @@ External camera entities can still be *associated* with the device
 (options → "Associated cameras"). Port **8765** remains an unknown binary
 protocol (not needed for video).
 
+### 4.6 Ring-picture log — per-channel ring detection (hardware-verified 2026-09-30)
+
+Every doorbell press stores a tiny **picture record** whose `channel` field
+says *which* input rang. This is the only ring signal on this hardware that
+carries the channel (Azeno broadcasts and `devicestatus.calling` do not).
+
+**Two-phase query** (POST `/tdkcgi`, same `lan-hash` auth as §3.1):
+
+1. `get.record.session` with EXACT content:
+
+   ```xml
+   <content><record>
+     <filetype>picture</filetype>
+     <occurtype>all</occurtype>
+     <channels>1,2</channels>
+     <starttime>2026-09-30T14:00:00</starttime>   <!-- ISO with capital T -->
+     <endtime>2026-09-30T15:00:00</endtime>
+     <stream>all</stream>
+   </record></content>
+   ```
+
+   Response: `<record><id>N</id></record>` — the session id.
+
+2. `get.record.message` with `<content><record><id>N</id></record></content>`
+   → pages of records (oldest first):
+
+   ```xml
+   <data>
+     <filetype>picture</filetype>
+     <occurtype>unknown</occurtype>
+     <channel>1</channel>
+     <starttime>2026-09-30t14:38:07z</starttime>   <!-- lowercase t/z -->
+     <endtime>2026-09-30t14:38:09z</endtime>
+     <filename>/mnt/sd/record/...</filename>
+     <filesize>20480</filesize>
+     <describe>...</describe>   <!-- base64, ends in CAM1, same for all -->
+   </data>
+   ```
+
+   Read pages until an empty `<datalist>` (cap ~20).
+
+**Hard-won constraints (do not "improve" these):**
+
+* **`filetype=all` (or other wrong params) crashes the device's CGI
+  service**: connections get refused for ~60–90 s. Only
+  `filetype=picture` with the field set above is safe.
+* Time filters only accept the ISO `T` separator; the device ignores the
+  window anyway (returns everything it has).
+* `occurtype` is always `unknown` — records cannot be told apart by event
+  type; `describe` is identical for all. **Channel is the only
+  discriminating field.**
+* The device may return a **truncated listing** (oldest-first prefix,
+  missing the newest entries) on cold reads; it also throttles rapid
+  connections. Detect new records by filename set + timestamp cutoff
+  (never by "max starttime changed"), reuse the session id (reopening
+  forces a full listing re-read), pace requests (~1 req / 3 s), and prime
+  the baseline over **two** cycles (`records.py`).
+* `get.record.session` answering **`-1`/`-10`** = command unknown on that
+  firmware dialect (IDS9478AW family) → give up cleanly.
+
+**Channel table** (`get.device.attachInfo`, JSON even for XML requests —
+parser must tolerate both):
+
+| key | type | id | name | children |
+|---|---|---|---|---|
+| `Channel_1` | cam | 1 | CAM1 | `Lock_1_1` → **DOOR1** (`door=1,lock=1`, verified) |
+| `Channel_2` | cam | 2 | CAM2 | `Lock_2_1` → DOOR2 (`door=2,lock=1`, untested) |
+| `Channel_3`/`Channel_4` | cctv | 3/4 | CCTV1/CCTV2 | — |
+| `Gate_1` | lock | 2 | Automatic gate | — |
+
+Wiring on the reference install (owner-confirmed): **channel 1 = camera
+doorbell** (live-verified: its presses produce `<channel>1</channel>`
+records), **channel 2 = dummy button**. One Wi-Fi station serves both.
+`profile.chns.total = 4` (`cam 2`, `cctv 2`), `ability.switchdirectly:1`.
+
+**HA implementation (v0.4.0):** `records.py` `RecordRingWatcher` polls the
+log every `record_poll_interval` s (default 3, 3–30) while
+`enable_record_rung` is on, fires `coordinator.note_rung("records",
+channel)` for records newer than the primed cutoff; events carry
+`channel` + `channel_name` (options `channel_1_name`/`channel_2_name`,
+defaults "Channel 1"/"Channel 2"). `enable_lan_rung` Azeno remains as a
+channel-less fallback; both sources land in one event within a 10 s dedup
+window (`DOORBELL_RUNG_DEDUP_SECONDS`).
+
+Known caveat: the channel-2 record path was never observed live (owner
+declined the test); if the firmware skips picture saves for the dummy
+button, those rings arrive channel-less via Azeno instead.
+
 ---
 
 ## 5. Connectivity summary (how the pieces fit)

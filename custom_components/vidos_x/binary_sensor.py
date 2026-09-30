@@ -64,4 +64,9 @@ class VidosDoorbellBinarySensor(VidosEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         last_rung = self.coordinator.last_rung
-        return {"last_rung": last_rung.isoformat(timespec="seconds") if last_rung else None}
+        channel = self.coordinator.last_rung_channel
+        return {
+            "last_rung": last_rung.isoformat(timespec="seconds") if last_rung else None,
+            "channel": channel,
+            "channel_name": self.coordinator.channel_name(channel),
+        }

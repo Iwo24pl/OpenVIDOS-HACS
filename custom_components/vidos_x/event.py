@@ -47,5 +47,13 @@ class VidosDoorbellEvent(VidosEntity, EventEntity):
         """Trigger the HA event entity for this device's ring."""
         if event.data.get("entry_id") != self._entry.entry_id:
             return
-        self._trigger_event(EVENT_TYPE_RING, {"when": event.data.get("when")})
+        self._trigger_event(
+            EVENT_TYPE_RING,
+            {
+                "when": event.data.get("when"),
+                "source": event.data.get("source"),
+                "channel": event.data.get("channel"),
+                "channel_name": event.data.get("channel_name"),
+            },
+        )
         self.async_write_ha_state()

@@ -14,12 +14,17 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .cgi import VidosCgiClient, VidosCgiConnectionError, VidosCgiError
 from .const import (
+    CONF_CHANNEL_1_NAME,
+    CONF_CHANNEL_2_NAME,
+    DEFAULT_CHANNEL_1_NAME,
+    DEFAULT_CHANNEL_2_NAME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     DOORBELL_ON_SECONDS,
+    DOORBELL_RUNG_DEDUP_SECONDS,
     EVENT_DOORBELL_RUNG,
 )
-from .models import VidosStatus, ring_started
+from .models import VidosStatus, ring_started, rung_is_duplicate
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,16 +51,38 @@ class VidosXCoordinator(DataUpdateCoordinator[VidosStatus]):
         self.config_entry = entry
         self.client = client
         self.last_rung: datetime | None = None
+        self.last_rung_channel: int | None = None
         self._rung_off_cancel: Callable[[], None] | None = None
 
+    def channel_name(self, channel: int | None) -> str | None:
+        """Configured display name for a ring-log channel."""
+        if channel == 1:
+            return self.config_entry.options.get(
+                CONF_CHANNEL_1_NAME, DEFAULT_CHANNEL_1_NAME
+            )
+        if channel == 2:
+            return self.config_entry.options.get(
+                CONF_CHANNEL_2_NAME, DEFAULT_CHANNEL_2_NAME
+            )
+        return None
+
     @callback
-    def note_rung(self, source: str = "cgi") -> None:
+    def note_rung(self, source: str = "cgi", channel: int | None = None) -> None:
         """Fire ``<domain>.doorbell_rung`` and pulse the doorbell sensor.
 
-        Sources: ``cgi`` (status flag), ``lan-scan`` / ``lan-reply`` (Azeno
-        broadcast chain - the only LAN signal verified on hardware).
+        Sources: ``records`` (device ring log - carries the channel),
+        ``cgi`` (status flag), ``lan-scan`` / ``lan-reply`` (Azeno broadcast
+        chain). One press observed by several sources inside the dedup
+        window collapses into a single event.
         """
-        self.last_rung = datetime.now()
+        now = datetime.now()
+        if rung_is_duplicate(self.last_rung, now, DOORBELL_RUNG_DEDUP_SECONDS):
+            _LOGGER.debug(
+                "suppressed duplicate ring (%s, channel=%s)", source, channel
+            )
+            return
+        self.last_rung = now
+        self.last_rung_channel = channel
         if self._rung_off_cancel is not None:
             self._rung_off_cancel()
         self._rung_off_cancel = async_call_later(
@@ -68,9 +95,16 @@ class VidosXCoordinator(DataUpdateCoordinator[VidosStatus]):
                 "entry_id": self.config_entry.entry_id,
                 "when": self.last_rung.isoformat(timespec="seconds"),
                 "source": source,
+                "channel": channel,
+                "channel_name": self.channel_name(channel),
             },
         )
-        _LOGGER.info("Doorbell rang (%s): %s", source, self.config_entry.title)
+        _LOGGER.info(
+            "Doorbell rang (%s, channel=%s): %s",
+            source,
+            channel,
+            self.config_entry.title,
+        )
         self.async_update_listeners()
 
     @callback

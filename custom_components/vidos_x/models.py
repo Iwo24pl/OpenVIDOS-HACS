@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -71,3 +72,16 @@ def ring_started(
     if prev_fields is None:
         return False  # first poll: no known previous state, never a fresh press
     return not _is_ringing(prev_fields) and _is_ringing(new_fields)
+
+
+def rung_is_duplicate(
+    last_rung: datetime | None, now: datetime, window: float
+) -> bool:
+    """True when ``now`` falls inside the dedup window after ``last_rung``.
+
+    One press can be observed by several sources (record log, Azeno burst,
+    CGI flag); sources within ``window`` seconds collapse into one event.
+    """
+    if last_rung is None:
+        return False
+    return (now - last_rung).total_seconds() < window

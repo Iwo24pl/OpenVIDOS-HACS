@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 import logging
 from typing import Any
@@ -34,18 +35,25 @@ from .const import (
     CONF_ENABLE_ALARM_SWITCH,
     CONF_ENABLE_CAMERA,
     CONF_ENABLE_LAN_RUNG,
+    CONF_ENABLE_RECORD_RUNG,
+    CONF_RECORD_POLL_INTERVAL,
     CONF_SCHEME,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
     DEFAULT_DOOR,
     DEFAULT_ENABLE_CAMERA,
     DEFAULT_ENABLE_LAN_RUNG,
+    DEFAULT_ENABLE_RECORD_RUNG,
     DEFAULT_LOCK,
+    DEFAULT_RECORD_POLL_INTERVAL,
     DOMAIN,
+    MAX_RECORD_POLL_INTERVAL,
+    MIN_RECORD_POLL_INTERVAL,
     SERVICE_OPEN_DOOR,
 )
 from .coordinator import VidosXCoordinator
 from .lan import AzenoLanListener
+from .records import RecordRingWatcher
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +83,8 @@ class VidosRuntimeData:
     coordinator: VidosXCoordinator
     platforms: list[Platform] = field(default_factory=list)
     lan_listener: AzenoLanListener | None = None
+    ring_watcher: RecordRingWatcher | None = None
+    ring_watcher_task: asyncio.Task[None] | None = None
 
 
 type VidosConfigEntry = ConfigEntry[VidosRuntimeData]
@@ -204,12 +214,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> boo
         if not await lan_listener.async_start():
             lan_listener = None
 
+    ring_watcher: RecordRingWatcher | None = None
+    ring_watcher_task: asyncio.Task[None] | None = None
+    if entry.options.get(CONF_ENABLE_RECORD_RUNG, DEFAULT_ENABLE_RECORD_RUNG):
+        interval = entry.options.get(
+            CONF_RECORD_POLL_INTERVAL, DEFAULT_RECORD_POLL_INTERVAL
+        )
+        try:
+            interval = min(max(float(interval), MIN_RECORD_POLL_INTERVAL), MAX_RECORD_POLL_INTERVAL)
+        except (TypeError, ValueError):
+            interval = float(DEFAULT_RECORD_POLL_INTERVAL)
+        ring_watcher = RecordRingWatcher(
+            client,
+            interval=interval,
+            on_ring=lambda channel, _starttime: coordinator.note_rung(
+                "records", channel
+            ),
+        )
+        ring_watcher_task = hass.async_create_task(
+            ring_watcher.async_run(), name=f"{DOMAIN}-ring-log-{entry.entry_id}"
+        )
+
     platforms = _platforms_for_entry(entry)
     entry.runtime_data = VidosRuntimeData(
         client=client,
         coordinator=coordinator,
         platforms=platforms,
         lan_listener=lan_listener,
+        ring_watcher=ring_watcher,
+        ring_watcher_task=ring_watcher_task,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
@@ -223,6 +256,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: VidosConfigEntry) -> bo
     if entry.runtime_data:
         if entry.runtime_data.lan_listener:
             entry.runtime_data.lan_listener.async_stop()
+        if entry.runtime_data.ring_watcher:
+            entry.runtime_data.ring_watcher.stop()
+        if entry.runtime_data.ring_watcher_task:
+            entry.runtime_data.ring_watcher_task.cancel()
         entry.runtime_data.coordinator.cancel_rung_pulse()
     platforms = entry.runtime_data.platforms if entry.runtime_data else list(PLATFORMS)
     return await hass.config_entries.async_unload_platforms(entry, platforms)

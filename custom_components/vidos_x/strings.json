@@ -35,6 +35,10 @@
           "verify_ssl": "Verify TLS certificate",
           "enable_alarm_switch": "Enable alarm arm/disarm switch (experimental)",
           "enable_lan_rung": "Detect rings via LAN broadcast (fast, needs phone on Wi-Fi)",
+          "enable_record_rung": "Detect rings via the ring picture log (per-channel)",
+          "record_poll_interval": "Ring log poll interval (seconds)",
+          "channel_1_name": "Channel 1 display name",
+          "channel_2_name": "Channel 2 display name",
           "enable_camera": "Snapshot camera (built-in QUII video)",
           "door_password": "Door opening password",
           "default_door": "Open button - door (channel)",
@@ -47,6 +51,10 @@
           "default_lock": "Lock id used by the Open door button and the service default. 1 = door (verified), 2 = automatic gate, 0 = default.",
           "cameras": "Camera entities from other integrations to associate with this intercom: they are shown on the device page (not restreamed).",
           "enable_lan_rung": "Listens for the Vidos app/door-station ASZENO discovery burst on UDP 5000/5001; fires the doorbell event within seconds of a ring. Turning it off falls back to status polling only.",
+          "enable_record_rung": "Reads the device's picture-record log (get.record.session/message) to detect presses; the record's channel tells you which doorbell rang. Keep the LAN broadcast fallback enabled as well.",
+          "record_poll_interval": "How often to query the ring picture log. Lower is faster, higher is gentler on the device (3-30 seconds).",
+          "channel_1_name": "Name shown for rings on channel 1 (camera doorbell).",
+          "channel_2_name": "Name shown for rings on channel 2 (dummy button).",
           "enable_camera": "Adds a camera entity that grabs a still image on demand from the intercom's QUII video port (no continuous streaming). Requires the HA ffmpeg binary."
         }
       }

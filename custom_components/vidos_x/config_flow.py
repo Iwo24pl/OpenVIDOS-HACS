@@ -18,6 +18,8 @@ from . import cgi as cgi_mod
 from .const import (
     CONF_CAMERAS,
     CONF_CGI_PORT,
+    CONF_CHANNEL_1_NAME,
+    CONF_CHANNEL_2_NAME,
     CONF_DEFAULT_DOOR,
     CONF_DEFAULT_LOCK,
     CONF_DEVICE_IP,
@@ -28,18 +30,26 @@ from .const import (
     CONF_ENABLE_ALARM_SWITCH,
     CONF_ENABLE_CAMERA,
     CONF_ENABLE_LAN_RUNG,
+    CONF_ENABLE_RECORD_RUNG,
     CONF_MODEL,
+    CONF_RECORD_POLL_INTERVAL,
     CONF_SCHEME,
     CONF_SOURCE,
     CONF_VERIFY_SSL,
     DEFAULT_CGI_PORT,
+    DEFAULT_CHANNEL_1_NAME,
+    DEFAULT_CHANNEL_2_NAME,
     DEFAULT_DOOR,
     DEFAULT_ENABLE_CAMERA,
     DEFAULT_ENABLE_LAN_RUNG,
+    DEFAULT_ENABLE_RECORD_RUNG,
     DEFAULT_LOCK,
+    DEFAULT_RECORD_POLL_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MAX_RECORD_POLL_INTERVAL,
     MAX_SCAN_INTERVAL,
+    MIN_RECORD_POLL_INTERVAL,
     MIN_SCAN_INTERVAL,
     SOURCE_MANUAL,
 )
@@ -184,6 +194,36 @@ class VidosXOptionsFlow(OptionsFlow):
                             CONF_ENABLE_CAMERA, DEFAULT_ENABLE_CAMERA
                         ),
                     ): bool,
+                    vol.Required(
+                        CONF_ENABLE_RECORD_RUNG,
+                        default=options.get(
+                            CONF_ENABLE_RECORD_RUNG, DEFAULT_ENABLE_RECORD_RUNG
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_RECORD_POLL_INTERVAL,
+                        default=options.get(
+                            CONF_RECORD_POLL_INTERVAL, DEFAULT_RECORD_POLL_INTERVAL
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(
+                            min=MIN_RECORD_POLL_INTERVAL,
+                            max=MAX_RECORD_POLL_INTERVAL,
+                        ),
+                    ),
+                    vol.Optional(
+                        CONF_CHANNEL_1_NAME,
+                        default=options.get(
+                            CONF_CHANNEL_1_NAME, DEFAULT_CHANNEL_1_NAME
+                        ),
+                    ): cv.string,
+                    vol.Optional(
+                        CONF_CHANNEL_2_NAME,
+                        default=options.get(
+                            CONF_CHANNEL_2_NAME, DEFAULT_CHANNEL_2_NAME
+                        ),
+                    ): cv.string,
                     vol.Optional(
                         CONF_DOOR_PASSWORD,
                         default=options.get(

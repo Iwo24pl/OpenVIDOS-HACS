@@ -3,13 +3,15 @@
 Home Assistant custom integration for **Vidos X** intercoms / door stations
 (Vidos sp. z o.o., white-labeled Qualvision/Quvii "TDK cloud" platform).
 
-> **Status: Phase 0 verified (V1.0) + live video snapshots (v0.3.0).** The status
+> **Status: Phase 0 verified (V1.0) + live video snapshots (v0.3.0) + per-channel
+> ring detection (v0.4.0).** The status
 > poll and door-open commands were validated on real hardware (IDS9483AW):
 > header `adminapp2` + `sha256(password)` + `passwordencode=1`, unlock content
 > `door`+`locknumber`+`password=sha256(...)`. **Video:** no RTSP/ONVIF — but the
 > proprietary `quii://` media port 34567 is reverse-engineered and ported
-> (snapshot camera, see *Video* below). Cloud discovery lives in `cloud.py`
-> (backend kept, removed from the setup UI).
+> (snapshot camera, see *Video* below). **Rings:** the device's picture-record
+> log reports *which* doorbell rang (channel 1/2). Cloud discovery lives in
+> `cloud.py` (backend kept, removed from the setup UI).
 
 ## Features
 
@@ -18,7 +20,7 @@ Home Assistant custom integration for **Vidos X** intercoms / door stations
 | Open door (`set.device.opendoor`) | `button.open_door` + `vidos_x.open_door` service | **verified on hardware** (sha256 unlock password) |
 | Device online status | `binary_sensor.status` | **verified on hardware** (local poll) |
 | Lock state | `sensor.lock_state` | verified field (`devicestatus.lockstatus`), model-dependent |
-| Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | **LAN broadcast verified on hardware** (Azeno scan/reply, ~6 s after ring); status-flag path kept as fallback |
+| Doorbell / ring event | `binary_sensor.*_doorbell` + `event.*_doorbell` | **per-channel via the ring picture log** (v0.4.0, hardware-verified) + LAN broadcast fallback (Azeno scan/reply, ~6 s after ring) |
 | Alarm arm/disarm | `switch.alarm_disarmed` (opt-in) | experimental |
 | Live video | `camera.*` snapshot (built-in `quii://` port) | **verified on hardware** (no RTSP/ONVIF; on-demand snapshot via port 34567) |
 | Associated cameras | camera entities from other integrations attached to the device page | options: pick entities (multiple) |
@@ -46,7 +48,9 @@ directory and restart.
   (the backend in `cloud.py` is kept for later).
 
 Options (per device): poll interval, TLS verification, LAN ring detection
-(on by default), snapshot camera (on by default), door password, open-button
+(on by default), ring-picture-log detection (on by default; interval 3–30 s,
+display names for channel 1/2), snapshot camera (on by default), door
+password, open-button
 output (`default_door` / `default_lock`, default `1`/`1` = the verified DOOR1
 output), associated camera entities (multiple, from other integrations),
 experimental alarm switch.
@@ -67,13 +71,26 @@ but not yet heard to actuate — see `docs/VIDOS_X_PROTOCOL.md` §3.1.
 
 ## Doorbell notifications
 
-**How a ring is detected (verified 2026-10-02):** `get.device.status` does
-*not* change when the bell is pressed — polling alone cannot see a ring. The
-integration therefore listens on the LAN for the Azeno discovery chain: the
+**Primary: the ring picture log (v0.4.0, per-channel).** Every press makes
+the station store a tiny picture record; a two-phase
+`get.record.session` / `get.record.message` query (every 3 s by default)
+picks up new records and their `<channel>` — so the event says **which**
+doorbell rang (channel 1 = camera doorbell, channel 2 = dummy button on the
+reference install; names configurable in the options). The poller keeps one
+session open, primes a two-cycle baseline (the device may answer with a
+truncated listing) and collapses records/Azeno into a single event inside a
+10 s window. Protocol details and the firmware traps (never send
+`filetype=all` — it crashes the CGI service) are in
+[`docs/VIDOS_X_PROTOCOL.md`](docs/VIDOS_X_PROTOCOL.md) §4.6.
+
+**Fallback: LAN broadcast (verified 2026-10-02, channel-less).**
+`get.device.status` does *not* change when the bell is pressed — polling
+alone cannot see a ring. The integration therefore also listens on the LAN
+for the Azeno discovery chain: the
 Vidos app on a phone (woken by the push notification, app closed) broadcasts
 `ASZENO.SEARCH.V4.1` to UDP 5000, and the door station answers on UDP 5001 —
-observed ~6 s after every ring, silence otherwise. That burst fires the
-`vidos_x.doorbell_rung` event, pulses the binary sensor for 15 s and triggers
+observed ~6 s after every ring, silence otherwise. Both sources fire the
+`vidos_x.doorbell_rung` event, pulse the binary sensor for 15 s and trigger
 the `event.*_doorbell` entity:
 
 ```yaml
@@ -89,21 +106,28 @@ automation:
       - service: persistent_notification.create
         data:
           title: Doorbell
-          message: "{{ trigger.event.data.device }} rang at {{ trigger.event.data.when }}"
+          message: >-
+            {{ trigger.event.data.channel_name or trigger.event.data.device }}
+            rang at {{ trigger.event.data.when }}
 ```
 
 Notes:
 
-* Requires a phone with the Vidos X app **on the same LAN** (the burst comes
-  from the phone; HA and the phone just need to share a broadcast domain).
-  Turn off *LAN ring detection* in the options if you don't want UDP 5000/5001
-  bound; polling fallback (`devicestatus.calling`) stays active either way.
-* HA must receive **broadcasts**: bare-metal/VM on the LAN is fine; Docker
-  bridge networks usually are not (use `network_mode: host`).
+* *Ring picture log detection* (on by default) needs nothing but the device
+  on the LAN; *LAN ring detection* additionally requires a phone with the
+  Vidos X app **on the same LAN** (the burst comes from the phone; HA and
+  the phone just need to share a broadcast domain). Turn it off in the
+  options if you don't want UDP 5000/5001 bound.
+* HA must receive **broadcasts** for the fallback path: bare-metal/VM on the
+  LAN is fine; Docker bridge networks usually are not (use
+  `network_mode: host`).
 * Known caveat: opening the Vidos app manually runs the same discovery scan
-  and can produce a false ring event.
+  and can produce a false ring event (now deduplicated against a log ring
+  within 10 s).
 * Event payload: `device`, `entry_id`, `when`, `source`
-  (`lan-scan` / `lan-reply` / `cgi`).
+  (`records` / `lan-scan` / `lan-reply` / `cgi`), `channel` (1/2 or `null`
+  for channel-less sources), `channel_name` ("Channel 1"/"Channel 2" by
+  default, configurable).
 * `event.*_doorbell` (device class `doorbell`, event type `ring`) is the
   stateless alternative — its state changes to a timestamp on every press:
 
@@ -113,7 +137,7 @@ Notes:
       entity_id: event.your_intercom_doorbell
   ```
 * `binary_sensor.*_doorbell` (plain state, `mdi:doorbell` icon) is ON for 15 s
-  after each ring; attribute `last_rung` holds the last ring timestamp.
+  after each ring; attributes `last_rung`, `channel`, `channel_name`.
 * Debug the LAN chain standalone with `python tools/lanwatch.py`.
 
 ## Video
@@ -168,7 +192,11 @@ implementation plan in [`docs/HACS_INTEGRATION_PLAN.md`](docs/HACS_INTEGRATION_P
 4. ✅ `quii://` port 34567 reverse-engineered and ported (v0.3.0): handshake,
    AES-256-CBC framing and keyframe extraction verified on hardware; snapshot
    camera produces JPEG via local ffmpeg (see §4 of the protocol doc).
-5. Cloud discovery UI removed; `cloud.py` backend kept for a later release.
+5. ✅ Ring picture log queried on hardware (v0.4.0): two-phase
+   `get.record.session`/`get.record.message`, records carry the ringing
+   channel (camera-press → `<channel>1</channel>` confirmed); `filetype=all`
+   crash trap documented (§4.6).
+6. Cloud discovery UI removed; `cloud.py` backend kept for a later release.
 
 ## Security notes
 
