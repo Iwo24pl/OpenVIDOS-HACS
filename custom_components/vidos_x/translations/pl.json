@@ -1,0 +1,88 @@
+﻿{
+  "config": {
+    "step": {
+      "manual": {
+        "title": "Po┼é─ůczenie z urz─ůdzeniem",
+        "data": {
+          "device_ip": "Adres IP urz─ůdzenia",
+          "cgi_port": "Port CGI",
+          "device_username": "Nazwa u┼╝ytkownika urz─ůdzenia",
+          "device_password": "Has┼éo urz─ůdzenia",
+          "verify_ssl": "Weryfikuj certyfikat TLS",
+          "scheme": "Schemat"
+        },
+        "data_description": {
+          "device_ip": "Adres IP domofonu w sieci lokalnej.",
+          "cgi_port": "Zwykle 443 (HTTPS) lub 80 (HTTP).",
+          "verify_ssl": "Wy┼é─ůcz, je┼Ťli urz─ůdzenie u┼╝ywa certyfikatu samopodpisanego."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie mo┼╝na po┼é─ůczy─ç si─Ö z urz─ůdzeniem",
+      "unknown": "Nieoczekiwany b┼é─ůd"
+    },
+    "abort": {
+      "already_configured": "To urz─ůdzenie jest ju┼╝ skonfigurowane"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje Vidos X",
+        "data": {
+          "scan_interval": "Interwa┼é odpytywania (sekundy)",
+          "verify_ssl": "Weryfikuj certyfikat TLS",
+          "enable_alarm_switch": "W┼é─ůcz prze┼é─ůcznik uzbrojenia alarmu (eksperymentalny)",
+          "enable_lan_rung": "Wykrywanie dzwonka przez broadcast LAN",
+          "enable_record_rung": "Wykrywanie dzwonka przez log zdj─Ö─ç dzwonka (z kana┼éem)",
+          "record_poll_interval": "Interwa┼é odpytywania logu dzwonka (sekundy)",
+          "channel_1_name": "Nazwa wy┼Ťwietlana kana┼éu 1",
+          "channel_2_name": "Nazwa wy┼Ťwietlana kana┼éu 2",
+          "enable_camera": "Kamera zrzut├│w (wbudowane wideo QUII)",
+          "door_password": "Has┼éo otwierania drzwi",
+          "default_door": "Przycisk otwierania - drzwi (kana┼é)",
+          "default_lock": "Przycisk otwierania - identyfikator zamka",
+          "cameras": "Powi─ůzane kamery"
+        },
+        "data_description": {
+          "door_password": "Has┼éo odblokowania do set.device.opendoor. Puste = u┼╝yj has┼éa urz─ůdzenia (wysy┼éane jako SHA-256).",
+          "default_door": "Kana┼é u┼╝ywany przez przycisk Otw├│rz drzwi i domy┼Ťlnie w us┼éudze. 1 = CAM1/DOOR1 (zweryfikowano), 2 = CAM2/DOOR2, 0 = wyj┼Ťcia samodzielne (brama).",
+          "default_lock": "Identyfikator zamka u┼╝ywany przez przycisk Otw├│rz drzwi i domy┼Ťlnie w us┼éudze. 1 = drzwi (zweryfikowano), 2 = brama automatyczna, 0 = domy┼Ťlny.",
+          "cameras": "Encje kamer z innych integracji powi─ůzane z tym domofonem: pojawiaj─ů si─Ö na stronie urz─ůdzenia (bez restreamu).",
+          "enable_record_rung": "Odczytuje log zdj─Ö─ç dzwonka (get.record.session/message), aby wykrywa─ç naci┼Ťni─Öcia; kana┼é rekordu wskazuje, kt├│ry domofon zadzwoni┼é. Warto pozostawi─ç te┼╝ w┼é─ůczone wykrywanie LAN.",
+          "record_poll_interval": "Jak cz─Östo odpytywa─ç log zdj─Ö─ç dzwonka. Mniej = szybciej, wi─Öcej = ┼éagodniej dla urz─ůdzenia (3-30 sekund).",
+          "channel_1_name": "Nazwa wy┼Ťwietlana dla dzwonk├│w na kanale 1 (domofon z kamer─ů).",
+          "channel_2_name": "Nazwa wy┼Ťwietlana dla dzwonk├│w na kanale 2 (przycisk zast─Öpczy).",
+          "enable_camera": "Dodaje encj─Ö kamery, kt├│ra na ┼╝─ůdanie pobiera klatk─Ö z serialowego portu wideo QUII domofonu (bez ci─ůg┼éego streamowania). Wymaga binarki ffmpeg z HA."
+        }
+      }
+    }
+  },
+  "services": {
+    "open_door": {
+      "name": "Otw├│rz drzwi",
+      "description": "Otwiera drzwi w urz─ůdzeniu Vidos X.",
+      "fields": {
+        "device_id": {
+          "name": "Urz─ůdzenie",
+          "description": "Docelowe urz─ůdzenie Vidos X."
+        },
+        "door": {
+          "name": "Drzwi (kana┼é)",
+          "description": "Kana┼é, do kt├│rego nale┼╝y zamek: 1 = CAM1/DOOR1, 2 = CAM2/DOOR2, 0 = wyj┼Ťcia samodzielne (brama). Pomini─Öcie = ustawiony domy┼Ťlny.",
+          "example": "1"
+        },
+        "lock": {
+          "name": "Zamek",
+          "description": "Identyfikator zamka z get.device.attachInfo: 0 = domy┼Ťlny, 1 = drzwi, 2 = brama automatyczna. Pomini─Öcie = ustawiony domy┼Ťlny.",
+          "example": "1"
+        },
+        "password": {
+          "name": "Has┼éo",
+          "description": "Opcjonalne has┼éo drzwi."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+﻿{
+  "config": {
+    "step": {
+      "manual": {
+        "title": "Device connection",
+        "data": {
+          "device_ip": "Device IP address",
+          "cgi_port": "CGI port",
+          "device_username": "Device username",
+          "device_password": "Device password",
+          "verify_ssl": "Verify TLS certificate",
+          "scheme": "Scheme"
+        },
+        "data_description": {
+          "device_ip": "IP address of the intercom on your LAN.",
+          "cgi_port": "Usually 443 (HTTPS) or 80 (HTTP).",
+          "verify_ssl": "Disable if the device uses a self-signed certificate."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the device",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vidos X options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "verify_ssl": "Verify TLS certificate",
+          "enable_alarm_switch": "Enable alarm arm/disarm switch (experimental)",
+          "enable_lan_rung": "Detect rings via LAN broadcast",
+          "enable_record_rung": "Detect rings via the ring picture log (per-channel)",
+          "record_poll_interval": "Ring log poll interval (seconds)",
+          "channel_1_name": "Channel 1 display name",
+          "channel_2_name": "Channel 2 display name",
+          "enable_camera": "Snapshot camera (built-in QUII video)",
+          "door_password": "Door opening password",
+          "default_door": "Open button - door (channel)",
+          "default_lock": "Open button - lock id",
+          "cameras": "Associated cameras"
+        },
+        "data_description": {
+          "door_password": "Unlock password for set.device.opendoor. Leave empty to use the device password (sent SHA-256 hashed).",
+          "default_door": "Channel used by the Open door button and the service default. 1 = CAM1/DOOR1 (verified), 2 = CAM2/DOOR2, 0 = standalone outputs (gate).",
+          "default_lock": "Lock id used by the Open door button and the service default. 1 = door (verified), 2 = automatic gate, 0 = default.",
+          "cameras": "Camera entities from other integrations to associate with this intercom: they are shown on the device page (not restreamed).",
+          "enable_record_rung": "Reads the device's picture-record log (get.record.session/message) to detect presses; the record's channel tells you which doorbell rang. Keep the LAN broadcast fallback enabled as well.",
+          "record_poll_interval": "How often to query the ring picture log. Lower is faster, higher is gentler on the device (3-30 seconds).",
+          "channel_1_name": "Name shown for rings on channel 1 (camera doorbell).",
+          "channel_2_name": "Name shown for rings on channel 2 (dummy button).",
+          "enable_camera": "Adds a camera entity that grabs a still image on demand from the intercom's QUII video port (no continuous streaming). Requires the HA ffmpeg binary."
+        }
+      }
+    }
+  },
+  "services": {
+    "open_door": {
+      "name": "Open door",
+      "description": "Open a door on a Vidos X device.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "Target Vidos X device(s)."
+        },
+        "door": {
+          "name": "Door (channel)",
+          "description": "Channel the lock is attached to: 1 = CAM1/DOOR1, 2 = CAM2/DOOR2, 0 = standalone outputs (gate). Omit to use the configured default.",
+          "example": "1"
+        },
+        "lock": {
+          "name": "Lock",
+          "description": "Lock id from get.device.attachInfo: 0 = default, 1 = door, 2 = automatic gate. Omit to use the configured default.",
+          "example": "1"
+        },
+        "password": {
+          "name": "Password",
+          "description": "Optional door password."
+        }
+      }
+    }
+  }
+}

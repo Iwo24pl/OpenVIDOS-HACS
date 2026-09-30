@@ -1,5 +1,11 @@
 # Vidos X (`com.vidos.vidosx`) — protocol & connection dossier
 
+> **Companion doc:** [`APP_PARITY.md`](APP_PARITY.md) is the 1:1 app-parity
+> specification (command matrix, beans, auth, class→module map) produced by the
+> Phase-1 rewrite. This dossier records the hardware-captured wire facts; both
+> are normative for `custom_components/vidos_x/proto/`. `tools/probe.py` was
+> retired with the v0.x wipe (recover: `git show legacy-v0.4.0:tools/probe.py`).
+
 Source: static analysis of the unpacked XAPK (base APK decompiled with jadx 1.5.2, plus
 `assets/`, `resources.arsc`, native `.so` strings). Anything marked **VERIFY** must be
 confirmed against real hardware/network traffic.
